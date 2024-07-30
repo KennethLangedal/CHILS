@@ -2,348 +2,162 @@
 
 #include <stdlib.h>
 
-local_search local_search_init(graph g)
+local_search *local_search_init(graph g)
 {
-    local_search ls;
-    ls.C = malloc(sizeof(int));
-    ls.IS = malloc(sizeof(int) * g.N);
-    ls.nw = malloc(sizeof(int) * g.N);
-    ls.tabu = malloc(sizeof(int) * g.N);
+    local_search *ls = malloc(sizeof(local_search));
 
-    *ls.C = 0;
+    ls->c = 0;
+    ls->IS = malloc(sizeof(int) * g.N);
+
+    ls->qc = g.N;
+    ls->a = 1;
+    ls->NW = malloc(sizeof(int) * g.N);
+    ls->Q = malloc(sizeof(int) * g.N);
+    ls->C = malloc(sizeof(int) * g.N);
+    ls->_Q = malloc(sizeof(int) * g.N);
+    ls->_C = malloc(sizeof(int) * g.N);
+
+    ls->lc = 0;
+    ls->A = malloc(sizeof(int) * MAX_LOG);
+    ls->L = malloc(sizeof(int) * MAX_LOG);
 
     for (int u = 0; u < g.N; u++)
     {
-        ls.IS[u] = 0;
-        ls.nw[u] = 0;
-        ls.tabu[u] = 0;
+        ls->IS[u] = 0;
+        ls->NW[u] = 0;
+        ls->Q[u] = u;
+        ls->C[u] = 1;
+        ls->_Q[u] = 0;
+        ls->_C[u] = 0;
     }
 
     return ls;
 }
 
-void local_search_copy(graph g, local_search src, local_search dest)
+void local_search_free(local_search *ls)
 {
-    *dest.C = *src.C;
-
-    for (int u = 0; u < g.N; u++)
-    {
-        dest.IS[u] = src.IS[u];
-        dest.nw[u] = src.nw[u];
-        dest.tabu[u] = src.tabu[u];
-    }
+    free(ls->IS);
+    free(ls->NW);
+    free(ls->Q);
+    free(ls->C);
+    free(ls->A);
+    free(ls->L);
+    free(ls);
 }
 
-void local_search_free(local_search ls)
+void local_search_add_vertex(graph g, local_search *ls, int u)
 {
-    free(ls.C);
-    free(ls.IS);
-    free(ls.tabu);
-}
-
-void local_search_add_vertex(graph g, local_search ls, int u)
-{
-    if (ls.IS[u])
+    if (ls->IS[u])
         return;
 
-    ls.IS[u] = 1;
-    *ls.C += g.W[u];
+    if (ls->a)
+    {
+        ls->A[ls->lc] = ADD;
+        ls->L[ls->lc++] = u;
+    }
+
+    ls->IS[u] = 1;
+    ls->c += g.W[u];
 
     for (int i = g.V[u]; i < g.V[u + 1]; i++)
     {
         int v = g.E[i];
         local_search_remove_vertex(g, ls, v);
-        ls.nw[v] += g.W[u];
-    }
-}
+        ls->NW[v] += g.W[u];
 
-void local_search_remove_vertex(graph g, local_search ls, int u)
-{
-    if (!ls.IS[u])
-        return;
-
-    ls.IS[u] = 0;
-    *ls.C -= g.W[u];
-
-    for (int i = g.V[u]; i < g.V[u + 1]; i++)
-        ls.nw[g.E[i]] -= g.W[u];
-}
-
-void local_search_lock_in_vertex(graph g, local_search ls, int u)
-{
-    if (ls.tabu[u])
-        return;
-
-    ls.tabu[u] = 1;
-    for (int i = g.V[u]; i < g.V[u + 1]; i++)
-        ls.tabu[g.E[i]] = 1;
-
-    local_search_add_vertex(g, ls, u);
-}
-
-void local_search_lock_out_vertex(graph g, local_search ls, int u)
-{
-    if (ls.tabu[u])
-        return;
-
-    ls.tabu[u] = 1;
-
-    local_search_remove_vertex(g, ls, u);
-}
-
-void local_search_greedy(graph g, local_search ls, int *order)
-{
-    int imp = 1;
-    while (imp)
-    {
-        imp = 0;
-        for (int i = 0; i < g.N; i++)
+        if (ls->a && !ls->C[v])
         {
-            int u = order[i];
-            if (ls.nw[u] >= g.W[u] || ls.IS[u] || ls.tabu[u])
-                continue;
-
-            local_search_add_vertex(g, ls, u);
-            imp = 1;
-
-            // int nw = 0;
-            // for (int j = g.V[u]; j < g.V[u + 1]; j++)
-            // {
-            //     int v = g.E[j];
-            //     if (!ls.IS[v])
-            //         continue;
-
-            //     nw += g.W[v];
-            //     if (nw >= g.W[u])
-            //         break;
-            // }
-
-            // if (nw < g.W[u])
-            // {
-            //     local_search_add_vertex(g, ls, u);
-            //     imp = 1;
-            // }
+            ls->C[v] = 1;
+            ls->Q[ls->qc++] = v;
         }
     }
 }
 
-void local_search_add_vertex_walk(graph g, local_search ls, int u)
+void local_search_remove_vertex(graph g, local_search *ls, int u)
 {
-    local_search_add_vertex(g, ls, u);
+    if (!ls->IS[u])
+        return;
 
-    ls.tabu[u] = 1;
-    for (int i = g.V[u]; i < g.V[u + 1]; i++)
-        ls.tabu[g.E[i]] = 1;
+    if (ls->a)
+    {
+        ls->A[ls->lc] = REMOVE;
+        ls->L[ls->lc++] = u;
+    }
+    ls->IS[u] = 0;
+    ls->c -= g.W[u];
 
     for (int i = g.V[u]; i < g.V[u + 1]; i++)
     {
         int v = g.E[i];
-        for (int j = g.V[v]; j < g.V[v + 1]; j++)
+        ls->NW[v] -= g.W[u];
+
+        if (ls->a && !ls->C[v])
         {
+            ls->C[v] = 1;
+            ls->Q[ls->qc++] = v;
         }
     }
 }
 
-void local_search_k_one(graph g, local_search ls, int *order)
+void swap(int **a, int **b)
 {
-    int imp = 1;
-
-    graph _g;
-
-    _g.N = 0;
-    _g.V = malloc(sizeof(int) * (g.N + 1));
-    _g.E = malloc(sizeof(int) * g.V[g.N]);
-    _g.W = malloc(sizeof(int) * g.N);
-
-    int *R = malloc(sizeof(int) * g.N);
-    int *tmp = malloc(sizeof(int) * g.N);
-    int *mask = malloc(sizeof(int) * g.N);
-
-    while (imp)
-    {
-        for (int i = 0; i < g.N; i++)
-            mask[i] = -1;
-
-        imp = 0;
-        for (int i = 0; i < g.N; i++)
-        {
-            int u = order[i];
-            if (!ls.IS[u])
-                continue;
-
-            int nc = 0, nw = 0;
-            for (int j = g.V[u]; j < g.V[u + 1]; j++)
-            {
-                int v = g.E[j];
-                int val = 1;
-                for (int k = g.V[v]; k < g.V[v + 1]; k++)
-                {
-                    int w = g.E[k];
-                    if (w != u && ls.IS[w])
-                    {
-                        val = 0;
-                        break;
-                    }
-                }
-
-                if (!val)
-                    continue;
-
-                R[v] = nc;
-                tmp[nc] = v;
-                mask[v] = u;
-                nc++;
-                nw += g.W[v];
-            }
-
-            if (nc < 2 || nw < g.W[u])
-                continue;
-
-            // Construct subgraph
-            _g.N = nc;
-            int ei = 0;
-            for (int j = 0; j < _g.N; j++)
-            {
-                int v = tmp[j];
-                _g.V[j] = ei;
-                _g.W[j] = g.W[v];
-
-                for (int k = g.V[v]; k < g.V[v + 1]; k++)
-                {
-                    int w = g.E[k];
-                    if (mask[w] == u)
-                        _g.E[ei++] = R[w];
-                }
-            }
-            _g.V[_g.N] = ei;
-
-            for (int j = 0; j < _g.N; j++)
-                R[j] = j;
-
-            local_search _ls = local_search_init(_g);
-            local_search_greedy(_g, _ls, R);
-
-            // printf("%d vs %d\n", g.W[u], *_ls.C);
-            if (g.W[u] < *_ls.C)
-            {
-                imp = 1;
-                local_search_remove_vertex(g, ls, u);
-                for (int j = 0; j < nc; j++)
-                {
-                    int v = tmp[j];
-                    if (_ls.IS[j])
-                        local_search_add_vertex(g, ls, v);
-                }
-            }
-
-            local_search_free(_ls);
-        }
-    }
-
-    free(R);
-    free(tmp);
-    free(mask);
-
-    graph_free(_g);
+    int *t = *a;
+    *a = *b;
+    *b = t;
 }
 
-void local_search_k_c(graph g, local_search ls, int *order)
+void local_search_greedy(graph g, local_search *ls)
 {
-    int imp = 1;
+    local_search_shuffle_queue(ls);
 
-    graph _g;
-
-    _g.N = 0;
-    _g.V = malloc(sizeof(int) * (g.N + 1));
-    _g.E = malloc(sizeof(int) * g.V[g.N]);
-    _g.W = malloc(sizeof(int) * g.N);
-
-    int *R = malloc(sizeof(int) * g.N);
-    int *tmp = malloc(sizeof(int) * g.N);
-    int *mask = malloc(sizeof(int) * g.N);
-
-    while (imp)
+    int n = ls->qc;
+    ls->qc = 0;
+    while (n > 0)
     {
-        for (int i = 0; i < g.N; i++)
-            mask[i] = -1;
+        swap(&ls->Q, &ls->_Q);
+        swap(&ls->C, &ls->_C);
 
-        imp = 0;
-        for (int i = 0; i < g.N; i++)
+        for (int i = 0; i < n; i++)
         {
-            int u = order[i];
-            if (!ls.IS[u])
-                continue;
+            int u = ls->_Q[i];
+            ls->_C[u] = 0;
 
-            int nc = 0, nw = 0, rw = g.W[u];
-            for (int j = g.V[u]; j < g.V[u + 1]; j++)
-            {
-                int v = g.E[j];
-                for (int k = g.V[v]; k < g.V[v + 1]; k++)
-                {
-                    int w = g.E[k];
-                    if (w != u && ls.IS[w] && mask[w] != u)
-                    {
-                        R[w] = nc;
-                        tmp[nc] = w;
-                        mask[w] = u;
-                        nc++;
-                        rw += g.W[w];
-                    }
-                }
-
-                R[v] = nc;
-                tmp[nc] = v;
-                mask[v] = u;
-                nc++;
-                nw += g.W[v];
-            }
-
-            if (nc < 1 || nw < g.W[u])
-                continue;
-
-            // Construct subgraph
-            _g.N = nc;
-            int ei = 0;
-            for (int j = 0; j < _g.N; j++)
-            {
-                int v = tmp[j];
-                _g.V[j] = ei;
-                _g.W[j] = g.W[v];
-
-                for (int k = g.V[v]; k < g.V[v + 1]; k++)
-                {
-                    int w = g.E[k];
-                    if (mask[w] == u)
-                        _g.E[ei++] = R[w];
-                }
-            }
-            _g.V[_g.N] = ei;
-
-            for (int j = 0; j < _g.N; j++)
-                R[j] = j;
-
-            local_search _ls = local_search_init(_g);
-            local_search_greedy(_g, _ls, R);
-
-            if (rw < *_ls.C)
-            {
-                imp = 1;
-                for (int j = 0; j < nc; j++)
-                {
-                    int v = tmp[j];
-                    if (_ls.IS[j])
-                        local_search_add_vertex(g, ls, v);
-                }
-                // printf("%d vs %d (%d)\n", rw, *_ls.C, *ls.C);
-            }
-
-            local_search_free(_ls);
+            if (ls->NW[u] < g.W[u])
+                local_search_add_vertex(g, ls, u);
         }
+
+        local_search_shuffle_queue(ls);
+
+        n = ls->qc;
+        ls->qc = 0;
     }
+}
 
-    free(R);
-    free(tmp);
-    free(mask);
+void local_search_unwind(graph g, local_search *ls, int t)
+{
+    ls->a = 0;
+    while (ls->lc > t)
+    {
+        ls->lc--;
+        int u = ls->L[ls->lc];
+        int a = ls->A[ls->lc];
 
-    graph_free(_g);
+        if (a == ADD)
+            local_search_remove_vertex(g, ls, u);
+        else if (a == REMOVE)
+            local_search_add_vertex(g, ls, u);
+    }
+    ls->a = 1;
+}
+
+void local_search_shuffle_queue(local_search *ls)
+{
+    int n = ls->qc;
+    for (int i = 0; i < n - 1; i++)
+    {
+        int j = i + rand() / (RAND_MAX / (n - i) + 1);
+        int t = ls->Q[j];
+        ls->Q[j] = ls->Q[i];
+        ls->Q[i] = t;
+    }
 }

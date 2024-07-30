@@ -96,3 +96,50 @@ int graph_validate(int N, const int *V, const int *E)
 
     return 1;
 }
+
+graph graph_subgraph(graph g, int *mask, int *rm)
+{
+    int *fm = malloc(sizeof(int) * g.N);
+    int N = 0, M = 0;
+    for (int u = 0; u < g.N; u++)
+    {
+        if (!mask[u])
+            continue;
+
+        fm[u] = N;
+        rm[N] = u;
+        N++;
+
+        for (int i = g.V[u]; i < g.V[u + 1]; i++)
+            if (mask[g.E[i]])
+                M++;
+    }
+
+    graph sg = {.N = N};
+    sg.V = malloc(sizeof(int) * (g.N + 1));
+    sg.E = malloc(sizeof(int) * M);
+    sg.W = malloc(sizeof(int) * g.N);
+
+    M = 0;
+    for (int u = 0; u < g.N; u++)
+    {
+        if (!mask[u])
+            continue;
+
+        sg.W[fm[u]] = g.W[u];
+        sg.V[fm[u]] = M;
+
+        for (int i = g.V[u]; i < g.V[u + 1]; i++)
+        {
+            int v = g.E[i];
+            if (!mask[v])
+                continue;
+
+            sg.E[M] = fm[v];
+            M++;
+        }
+    }
+    sg.V[sg.N] = M;
+    free(fm);
+    return sg;
+}

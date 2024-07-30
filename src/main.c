@@ -3,18 +3,64 @@
 
 #include "graph.h"
 #include "local_search.h"
-#include "local_search_avx.h"
 #include "mwis.h"
 
-void shuffle(int *array, int n)
+int *run_ls(graph g, int rp, int k, int offset)
 {
-    for (int i = 0; i < n - 1; i++)
+    local_search *ls = local_search_init(g);
+
+    local_search_greedy(g, ls);
+
+    int best = ls->c;
+    int c = 0, t = 0;
+
+    while (c++ < k)
     {
-        int j = i + rand() / (RAND_MAX / (n - i) + 1);
-        int t = array[j];
-        array[j] = array[i];
-        array[i] = t;
+        for (int j = 0; j < g.N; j++)
+        {
+            int p = ls->lc;
+
+            int u = j; // rand() % g.N;
+            if (ls->IS[u])
+                local_search_remove_vertex(g, ls, u);
+            else
+                local_search_add_vertex(g, ls, u);
+
+            int r = rand() % rp;
+            for (int i = 0; i < r && ls->qc > 0; i++)
+            {
+                u = ls->Q[rand() % ls->qc];
+
+                if (ls->IS[u])
+                    local_search_remove_vertex(g, ls, u);
+                else
+                    local_search_add_vertex(g, ls, u);
+            }
+
+            local_search_greedy(g, ls);
+
+            if (ls->c > best)
+            {
+                t++;
+                best = ls->c;
+                printf("\r%d %d %d %d", ls->c + offset, c, t, ls->lc);
+                fflush(stdout);
+            }
+            else if (ls->c <= best)
+            {
+                local_search_unwind(g, ls, p);
+            }
+        }
     }
+    printf("\n");
+
+    int *S = malloc(sizeof(int) * g.N);
+    for (int i = 0; i < g.N; i++)
+        S[i] = ls->IS[i];
+
+    local_search_free(ls);
+
+    return S;
 }
 
 int main(int argc, char **argv)
@@ -24,136 +70,53 @@ int main(int argc, char **argv)
     int valid = graph_validate(g.N, g.V, g.E);
     printf("Graph valid %d |V|=%d, |E|=%d\n", valid, g.N, g.V[g.N] / 2);
 
-    local_search ls = local_search_init(g), best = local_search_init(g);
-    // local_search_avx ls = local_search_avx_init(g);
-
-    int *order = malloc(sizeof(int) * g.N);
+    int *C = malloc(sizeof(int) * g.N);
     for (int i = 0; i < g.N; i++)
-        order[i] = i;
+        C[i] = 0;
 
-    int *order_pos = malloc(sizeof(int) * g.N);
-    for (int i = 0; i < g.N; i++)
-        order_pos[i] = i;
-
-    int *in_count = malloc(sizeof(int) * g.N);
-    for (int i = 0; i < g.N; i++)
-        in_count[i] = 0;
-
-    // shuffle(order, g.N);
-
-    local_search_greedy(g, ls, order);
-    // local_search_k_one(g, ls, order);
-    // local_search_k_c(g, ls, order);
-
-    local_search_copy(g, ls, best);
-
-    int k = 0, t = 0;
-    while (k++ < 10000000)
+    for (int i = 0; i < 10; i++)
     {
-        for (int i = 0; i < (rand() % 8) + 1; i++)
+        int *S = run_ls(g, 64, 10000000, 0);
+        int in = 0, out = 0;
+        for (int j = 0; j < g.N; j++)
         {
-            int u = rand() % g.N;
-            if (ls.IS[u])
-                local_search_remove_vertex(g, ls, u);
-            else
-                local_search_add_vertex(g, ls, u);
-
-            int p = order_pos[u];
-            int v = order[g.N - 1 - i];
-            order[g.N - 1 - i] = u;
-            order_pos[u] = g.N - 1 - i;
-            order[p] = v;
-            order_pos[v] = p;
+            C[j] += S[j];
+            if (C[j] == 0)
+                out++;
+            else if (C[j] == i + 1)
+                in++;
         }
+        printf("%d %d / %d\n", in, out, g.N);
+        free(S);
+    }
 
-        // if ((k % 1000) == 0)
-        //     shuffle(order, g.N);
+    int *mask = malloc(sizeof(int) * g.N);
+    int offset = 0;
+    for (int i = 0; i < g.N; i++)
+        mask[i] = 1;
 
-        local_search_greedy(g, ls, order);
-
-        // ls.tabu[u] = 0;
-        // ls.tabu[v] = 0;
-
-        if (*ls.C > *best.C)
+    for (int u = 0; u < g.N; u++)
+    {
+        if (C[u] < 10)
+            continue;
+        offset += g.W[u];
+        mask[u] = 0;
+        for (int i = g.V[u]; i < g.V[u + 1]; i++)
         {
-            local_search_copy(g, ls, best);
-
-            t++;
-            // for (int i = 0; i < g.N; i++)
-            //     if (ls.IS[i])
-            //         in_count[i]++;
-
-            // valid = mwis_validate(g, ls.IS);
-            printf("%d %d %d\n", *ls.C, k, t);
-        }
-        else if (*ls.C < *best.C)
-        {
-            local_search_copy(g, best, ls);
+            int v = g.E[i];
+            mask[v] = 0;
         }
     }
 
-    // int rc = 0;
-    // for (int i = 0; i < g.N; i++)
-    // {
-    //     if (in_count[i] == 0)
-    //         local_search_lock_out_vertex(g, ls, i);
-    //     else if (in_count[i] == t)
-    //         local_search_lock_in_vertex(g, ls, i);
-    //     else
-    //         continue;
+    graph sg = graph_subgraph(g, mask, C);
 
-    //     rc++;
-    // }
-
-    // printf("Removed %d vertices\n", rc);
-
-    // k = 0, t = 0;
-    // while (k++ < 10000)
-    // {
-    //     for (int i = 0; i < 1; i++)
-    //     {
-    //         int u = rand() % g.N;
-    //         while (ls.tabu[u])
-    //             u = rand() % g.N;
-
-    //         if (ls.IS[u])
-    //             local_search_remove_vertex(g, ls, u);
-    //         else
-    //             local_search_add_vertex(g, ls, u);
-    //     }
-
-    //     shuffle(order, g.N);
-
-    //     local_search_greedy(g, ls, order);
-    //     // local_search_k_one(g, ls, order);
-    //     // local_search_k_c(g, ls, order);
-
-    //     if (*ls.C >= C)
-    //     {
-    //         C = *ls.C;
-    //         for (int i = 0; i < g.N; i++)
-    //             IS[i] = ls.IS[i];
-
-    //         t++;
-    //         for (int i = 0; i < g.N; i++)
-    //             if (IS[i])
-    //                 in_count[i]++;
-
-    //         valid = mwis_validate(g, ls.IS);
-    //         printf("%d %d\n", *ls.C, valid);
-    //     }
-    //     else if (*ls.C < C)
-    //     {
-    //         *ls.C = C;
-    //         for (int i = 0; i < g.N; i++)
-    //             ls.IS[i] = IS[i];
-    //     }
-    // }
+    for (int i = 0; i < 10; i++)
+    {
+        int *S = run_ls(sg, 32, 1000000, offset);
+        free(S);
+    }
 
     graph_free(g);
-    local_search_free(ls);
-    local_search_free(best);
-    free(order);
 
     return 0;
 }
