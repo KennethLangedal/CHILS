@@ -1,58 +1,123 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <omp.h>
 
 #include "graph.h"
 #include "local_search.h"
 #include "mwis.h"
 
-int *run_ls(graph g, int rp, int k, int offset)
+graph reduction(graph g, long long *offset)
 {
-    local_search *ls = local_search_init(g);
+    *offset = 0;
+    int *mask = malloc(sizeof(int) * g.N);
+    int *rm = malloc(sizeof(int) * g.N);
 
-    local_search_greedy(g, ls);
+    for (int i = 0; i < g.N; i++)
+        mask[i] = 1;
 
-    int best = ls->c;
-    int c = 0, t = 0;
-
-    while (c++ < k)
+    int imp = 1;
+    while (imp)
     {
-        for (int j = 0; j < g.N; j++)
+        imp = 0;
+        for (int u = 0; u < g.N; u++)
         {
-            int p = ls->lc;
-
-            int u = j; // rand() % g.N;
-            if (ls->IS[u])
-                local_search_remove_vertex(g, ls, u);
-            else
-                local_search_add_vertex(g, ls, u);
-
-            int r = rand() % rp;
-            for (int i = 0; i < r && ls->qc > 0; i++)
+            if (!mask[u])
+                continue;
+            int nw = 0;
+            for (int i = g.V[u]; i < g.V[u + 1]; i++)
             {
-                u = ls->Q[rand() % ls->qc];
-
-                if (ls->IS[u])
-                    local_search_remove_vertex(g, ls, u);
-                else
-                    local_search_add_vertex(g, ls, u);
+                int v = g.E[i];
+                if (!mask[v])
+                    continue;
+                nw += g.W[v];
             }
 
-            local_search_greedy(g, ls);
-
-            if (ls->c > best)
+            if (nw <= g.W[u])
             {
-                t++;
-                best = ls->c;
-                printf("\r%d %d %d %d", ls->c + offset, c, t, ls->lc);
-                fflush(stdout);
-            }
-            else if (ls->c <= best)
-            {
-                local_search_unwind(g, ls, p);
+                imp = 1;
+                *offset += g.W[u];
+                mask[u] = 0;
+                for (int i = g.V[u]; i < g.V[u + 1]; i++)
+                    mask[g.E[i]] = 0;
             }
         }
     }
-    printf("\n");
+
+    graph sg = graph_subgraph(g, mask, rm);
+    free(mask);
+    free(rm);
+    return sg;
+}
+
+int *run_ls(graph g, int *IS, int rp, int k, long long offset)
+{
+    local_search *ls = local_search_init(g);
+
+    for (int i = 0; i < g.N; i++)
+        if (IS[i])
+            local_search_add_vertex(g, ls, i);
+
+    local_search_greedy(g, ls);
+
+    long long best = ls->c;
+    int c = 0, t = 0;
+
+    double t0 = omp_get_wtime();
+
+    while (c++ < k && omp_get_wtime() - t0 < 3600.0)
+    {
+        ls->lc = 0;
+        int p = ls->lc;
+
+        int u = rand() % g.N;
+        // while (ls->IS[u] || ls->T[u])
+        //     u = rand() % g.N;
+
+        ls->T[u] = 1;
+        if (ls->IS[u])
+        {
+            local_search_remove_vertex(g, ls, u);
+        }
+        else
+        {
+            local_search_add_vertex(g, ls, u);
+            for (int i = g.V[u]; i < g.V[u + 1]; i++)
+                ls->T[g.E[i]] = 1;
+        }
+
+        int r = rand() % rp;
+        for (int i = 0; i < r && ls->qc > 0; i++)
+        {
+            int v = ls->Q[rand() % ls->qc], _t = 0;
+            while (ls->T[v] && _t++ < 100)
+                v = ls->Q[rand() % ls->qc];
+
+            if (ls->IS[v])
+                local_search_remove_vertex(g, ls, v);
+            else
+                local_search_add_vertex(g, ls, v);
+        }
+
+        local_search_greedy(g, ls);
+
+        ls->T[u] = 0;
+        if (ls->IS[u])
+            for (int i = g.V[u]; i < g.V[u + 1]; i++)
+                ls->T[g.E[i]] = 0;
+
+        if (ls->c > best)
+        {
+            t++;
+            best = ls->c;
+            // printf("\r%lld %.2lf %d %d %d  ", ls->c + offset, omp_get_wtime() - t0, c, t, ls->lc);
+            // fflush(stdout);
+        }
+        else if (ls->c < best)
+        {
+            local_search_unwind(g, ls, p);
+        }
+    }
+    // printf("\n");
 
     int *S = malloc(sizeof(int) * g.N);
     for (int i = 0; i < g.N; i++)
@@ -65,58 +130,86 @@ int *run_ls(graph g, int rp, int k, int offset)
 
 int main(int argc, char **argv)
 {
-    graph g = graph_parse(stdin);
+    FILE *f = fopen(argv[1], "r");
+    graph g = graph_parse(f);
+    fclose(f);
 
-    int valid = graph_validate(g.N, g.V, g.E);
-    printf("Graph valid %d |V|=%d, |E|=%d\n", valid, g.N, g.V[g.N] / 2);
-
-    int *C = malloc(sizeof(int) * g.N);
+    int *IS = malloc(sizeof(int) * g.N);
     for (int i = 0; i < g.N; i++)
-        C[i] = 0;
+        IS[i] = 0;
 
-    for (int i = 0; i < 10; i++)
+    if (argc > 2)
     {
-        int *S = run_ls(g, 64, 10000000, 0);
-        int in = 0, out = 0;
-        for (int j = 0; j < g.N; j++)
-        {
-            C[j] += S[j];
-            if (C[j] == 0)
-                out++;
-            else if (C[j] == i + 1)
-                in++;
-        }
-        printf("%d %d / %d\n", in, out, g.N);
-        free(S);
+        f = fopen(argv[2], "r");
+        int u;
+        while (fscanf(f, "%d\n", &u) == 1)
+            IS[u - 1] = 1;
+        fclose(f);
     }
 
-    int *mask = malloc(sizeof(int) * g.N);
-    int offset = 0;
-    for (int i = 0; i < g.N; i++)
-        mask[i] = 1;
+    // long long is = mwis_validate(g, IS);
+    // int valid = graph_validate(g.N, g.V, g.E);
+    // printf("Graph valid %d |V|=%d, |E|=%d IS=%lld\n", valid, g.N, g.V[g.N] / 2, is);
 
-    for (int u = 0; u < g.N; u++)
-    {
-        if (C[u] < 10)
-            continue;
-        offset += g.W[u];
-        mask[u] = 0;
-        for (int i = g.V[u]; i < g.V[u + 1]; i++)
-        {
-            int v = g.E[i];
-            mask[v] = 0;
-        }
-    }
+    int *S = run_ls(g, IS, 3, 1000000000, 0);
 
-    graph sg = graph_subgraph(g, mask, C);
+    long long val = mwis_validate(g, S);
+    printf("%s %lld\n", argv[1], val);
 
-    for (int i = 0; i < 10; i++)
-    {
-        int *S = run_ls(sg, 32, 1000000, offset);
-        free(S);
-    }
-
+    free(IS);
+    free(S);
     graph_free(g);
 
     return 0;
+
+    // int *C = malloc(sizeof(int) * g.N);
+    // for (int i = 0; i < g.N; i++)
+    //     C[i] = 0;
+
+    // int it = 200;
+    // for (int i = 0; i < it; i++)
+    // {
+    //     int *S = run_ls(g, 64, 100000, 0);
+    //     int in = 0, out = 0;
+    //     for (int j = 0; j < g.N; j++)
+    //     {
+    //         C[j] += S[j];
+    //         if (C[j] == 0)
+    //             out++;
+    //         else if (C[j] == i + 1)
+    //             in++;
+    //     }
+    //     printf("%d %d / %d\n", in, out, g.N);
+    //     free(S);
+    // }
+
+    // int *mask = malloc(sizeof(int) * g.N);
+    // int offset = 0;
+    // for (int i = 0; i < g.N; i++)
+    //     mask[i] = 1;
+
+    // for (int u = 0; u < g.N; u++)
+    // {
+    //     if (C[u] < it)
+    //         continue;
+    //     offset += g.W[u];
+    //     mask[u] = 0;
+    //     for (int i = g.V[u]; i < g.V[u + 1]; i++)
+    //     {
+    //         int v = g.E[i];
+    //         mask[v] = 0;
+    //     }
+    // }
+
+    // graph sg = graph_subgraph(g, mask, C);
+
+    // for (int i = 0; i < 10; i++)
+    // {
+    //     int *S = run_ls(sg, 8, 10000000, offset);
+    //     free(S);
+    // }
+
+    // graph_free(g);
+
+    // return 0;
 }

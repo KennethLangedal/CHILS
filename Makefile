@@ -1,7 +1,7 @@
 SHELL = /bin/bash
 
 CC = gcc
-CFLAGS = -g -std=gnu17 -O3 -march=native -I include -D _GNU_SOURCE
+CFLAGS = -g -std=gnu17 -O3 -march=native -fopenmp -I include -D _GNU_SOURCE
 
 OBJ = main.o graph.o local_search.o local_search_avx.o mwis.o
 

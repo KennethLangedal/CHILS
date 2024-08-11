@@ -2,4 +2,4 @@
 
 #include "graph.h"
 
-int mwis_validate(graph g, int *IS);
+long long mwis_validate(graph g, int *IS);

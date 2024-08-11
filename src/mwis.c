@@ -1,8 +1,8 @@
 #include "mwis.h"
 
-int mwis_validate(graph g, int *IS)
+long long mwis_validate(graph g, int *IS)
 {
-    int C = 0;
+    long long C = 0;
     for (int u = 0; u < g.N; u++)
     {
         if (!IS[u])
