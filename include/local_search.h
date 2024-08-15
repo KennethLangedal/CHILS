@@ -4,8 +4,6 @@
 
 #define REMOVE 0
 #define ADD 1
-#define REMOVE_TABU 2
-#define ADD_TABU 3
 
 #define MAX_LOG 1000000
 
@@ -17,7 +15,7 @@ typedef struct
 
     // Search structures
     int qc;
-    int *NW, *T, *P, *Q, *C, *_Q, *_C;
+    int *NW, *T, *_T, *P, *Q, *C, *_Q, *_C;
 
     // Action log
     int lc;
@@ -32,12 +30,10 @@ void local_search_add_vertex(graph g, local_search *ls, int u);
 
 void local_search_remove_vertex(graph g, local_search *ls, int u);
 
-void local_search_add_vertex_tabu(graph g, local_search *ls, int u);
+void local_search_lock_vertex(graph g, local_search *ls, int u);
 
-void local_search_remove_vertex_tabu(graph g, local_search *ls, int u);
+void local_search_unlock_vertex(graph g, local_search *ls, int u);
 
 void local_search_greedy(graph g, local_search *ls);
 
 void local_search_unwind(graph g, local_search *ls, int t);
-
-void local_search_unwind_tabu(graph g, local_search *ls, int t);

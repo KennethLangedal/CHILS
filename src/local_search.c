@@ -13,6 +13,7 @@ local_search *local_search_init(graph g)
     ls->qc = g.N;
     ls->NW = malloc(sizeof(int) * g.N);
     ls->T = malloc(sizeof(int) * g.N);
+    ls->_T = malloc(sizeof(int) * g.N);
     ls->P = malloc(sizeof(int) * g.N);
     ls->Q = malloc(sizeof(int) * g.N);
     ls->C = malloc(sizeof(int) * g.N);
@@ -28,6 +29,7 @@ local_search *local_search_init(graph g)
         ls->IS[u] = 0;
         ls->NW[u] = 0;
         ls->T[u] = 0;
+        ls->_T[u] = 0;
         ls->P[u] = 0;
         ls->Q[u] = u;
         ls->C[u] = 1;
@@ -90,27 +92,6 @@ void local_search_undo_add_vertex(graph g, local_search *ls, int u)
         ls->NW[g.E[i]] -= g.W[u];
 }
 
-void local_search_add_vertex_tabu(graph g, local_search *ls, int u)
-{
-    assert(ls->IS[u] == 0);
-
-    ls->A[ls->lc] = ADD_TABU;
-    ls->L[ls->lc++] = u;
-
-    ls->T[u] = 1;
-    for (int i = g.V[u]; i < g.V[u + 1]; i++)
-        ls->T[g.E[i]] = 1;
-
-    local_search_add_vertex(g, ls, u);
-}
-
-void local_search_undo_add_vertex_tabu(graph g, local_search *ls, int u)
-{
-    ls->T[u] = 0;
-    for (int i = g.V[u]; i < g.V[u + 1]; i++)
-        ls->T[g.E[i]] = 0;
-}
-
 void local_search_remove_vertex(graph g, local_search *ls, int u)
 {
     assert(ls->IS[u] == 1);
@@ -154,21 +135,24 @@ void local_search_undo_remove_vertex(graph g, local_search *ls, int u)
         ls->NW[g.E[i]] += g.W[u];
 }
 
-void local_search_remove_vertex_tabu(graph g, local_search *ls, int u)
+void local_search_lock_vertex(graph g, local_search *ls, int u)
 {
-    assert(ls->IS[u] == 1);
-
-    ls->A[ls->lc] = REMOVE_TABU;
-    ls->L[ls->lc++] = u;
-
     ls->T[u] = 1;
+    if (!ls->IS[u])
+        return;
 
-    local_search_remove_vertex(g, ls, u);
+    for (int i = g.V[u]; i < g.V[u + 1]; i++)
+        ls->T[u] = 1;
 }
 
-void local_search_undo_remove_vertex_tabu(graph g, local_search *ls, int u)
+void local_search_unlock_vertex(graph g, local_search *ls, int u)
 {
     ls->T[u] = 0;
+    if (!ls->IS[u])
+        return;
+
+    for (int i = g.V[u]; i < g.V[u + 1]; i++)
+        ls->T[u] = 0;
 }
 
 void local_search_two_one(graph g, local_search *ls, int u)
@@ -179,29 +163,29 @@ void local_search_two_one(graph g, local_search *ls, int u)
     int nc = 0;
     for (int i = g.V[u]; i < g.V[u + 1]; i++)
         if (ls->NW[g.E[i]] == g.W[u])
-            ls->T[nc++] = g.E[i];
+            ls->_T[nc++] = g.E[i];
 
     if (nc < 2)
         return;
 
     for (int i = 0; i < nc; i++)
     {
-        int v = ls->T[i];
+        int v = ls->_T[i];
 
         int i1 = 0, i2 = g.V[v];
         while (i1 < nc && i2 < g.V[v + 1])
         {
-            if (ls->T[i1] > g.E[i2])
+            int w1 = ls->_T[i1], w2 = g.E[i2];
+            if (w1 > w2)
                 i2++;
-            else if (ls->T[i1] == g.E[i2])
+            else if (w1 == w2)
                 i1++, i2++;
-            else if (ls->T[i1] == v)
+            else if (w1 == v)
                 i1++;
-            else if (g.W[ls->T[i1]] + g.W[v] > g.W[u])
+            else if (g.W[w1] + g.W[v] > g.W[u])
             {
-                int w = ls->T[i1];
                 local_search_add_vertex(g, ls, v);
-                local_search_add_vertex(g, ls, w);
+                local_search_add_vertex(g, ls, w1);
                 return;
             }
             else
@@ -250,8 +234,8 @@ void local_search_greedy(graph g, local_search *ls)
 
             if (!ls->IS[u] && ls->NW[u] < g.W[u])
                 local_search_add_vertex(g, ls, u);
-            // else if (ls->IS[u])
-            //     local_search_two_one(g, ls, u);
+            else if (ls->IS[u])
+                local_search_two_one(g, ls, u);
         }
 
         local_search_shuffle_queue(ls);
@@ -273,24 +257,5 @@ void local_search_unwind(graph g, local_search *ls, int t)
             local_search_undo_add_vertex(g, ls, u);
         else if (a == REMOVE)
             local_search_undo_remove_vertex(g, ls, u);
-        else if (a == ADD_TABU)
-            local_search_undo_add_vertex_tabu(g, ls, u);
-        else if (a == REMOVE_TABU)
-            local_search_undo_remove_vertex_tabu(g, ls, u);
-    }
-}
-
-void local_search_unwind_tabu(graph g, local_search *ls, int t)
-{
-    while (ls->lc > t)
-    {
-        ls->lc--;
-        int u = ls->L[ls->lc];
-        int a = ls->A[ls->lc];
-
-        if (a == ADD_TABU)
-            local_search_undo_add_vertex_tabu(g, ls, u);
-        else if (a == REMOVE_TABU)
-            local_search_undo_remove_vertex_tabu(g, ls, u);
     }
 }
