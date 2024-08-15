@@ -20,6 +20,8 @@ typedef struct
     // Action log
     int lc;
     int *A, *L;
+
+    // Add rand_r
 } local_search;
 
 local_search *local_search_init(graph g);

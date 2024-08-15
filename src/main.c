@@ -25,6 +25,12 @@ void explore(graph g, local_search *ls, int k, int nr, int verbose)
 
     int ref = ls->lc;
 
+    if (verbose)
+    {
+        printf("\r%lld %.2lf %d %d    ", ls->c, omp_get_wtime() - t0, c, t);
+        fflush(stdout);
+    }
+
     while (c++ < k)
     {
         ls->lc = ref;
@@ -87,7 +93,9 @@ int *run_ls_par(graph g, int *IS, int k, int nr, int it)
     for (int i = 0; i < g.N; i++)
         C[i] = -1;
 
-#pragma omp parallel
+    long long best = 0;
+
+#pragma omp parallel shared(best)
     {
         int tid = omp_get_thread_num();
         int nt = omp_get_num_threads();
@@ -97,10 +105,10 @@ int *run_ls_par(graph g, int *IS, int k, int nr, int it)
         explore(g, ls, k, nr, tid == 0);
 
 #pragma omp barrier
-#pragma omp critical
-        {
-            printf("Loced 0, tid %d: %lld\n", tid, ls->c);
-        }
+        // #pragma omp critical
+        //         {
+        //             printf("Loced 0, tid %d: %lld\n", tid, ls->c);
+        //         }
 
         for (int i = 0; i < it; i++)
         {
@@ -109,6 +117,7 @@ int *run_ls_par(graph g, int *IS, int k, int nr, int it)
                 for (int j = 0; j < g.N; j++)
                     C[j] = 0;
             }
+#pragma omp barrier
 #pragma omp critical
             {
                 for (int j = 0; j < g.N; j++)
@@ -119,25 +128,26 @@ int *run_ls_par(graph g, int *IS, int k, int nr, int it)
             int nl = 0;
             for (int j = 0; j < g.N; j++)
             {
-                if (C[j] == nt || C[j] == 0)
+                if (C[j] == nt) // (rand() % 2) == 0
                 {
-                    local_search_lock_vertex(g, ls, j); // TODO, add random, only includes
-                    nl++;
+                    local_search_lock_vertex(g, ls, j);
+                    for (int _j = g.V[j]; _j < g.V[j + 1]; _j++)
+                        local_search_lock_vertex(g, ls, g.E[_j]);
+                    nl += g.V[j + 1] - g.V[j] + 1;
                 }
             }
 
-            explore(g, ls, k, nr, tid == 0);
+            explore(g, ls, k * 5, nr, tid == 0);
 
 #pragma omp barrier
 
-#pragma omp critical
-            {
-                printf("Loced %d, tid %d: %lld\n", nl, tid, ls->c);
-            }
+            // #pragma omp critical
+            //             {
+            //                 printf("Loced %d, tid %d: %lld\n", nl, tid, ls->c);
+            //             }
 
             for (int j = 0; j < g.N; j++)
-                if (C[j] == nt || C[j] == 0)
-                    local_search_unlock_vertex(g, ls, j);
+                ls->T[j] = 0;
 
             explore(g, ls, k, nr, tid == 0);
 
@@ -145,7 +155,12 @@ int *run_ls_par(graph g, int *IS, int k, int nr, int it)
 
 #pragma omp critical
             {
-                printf("Loced 0, tid %d: %lld\n", tid, ls->c);
+
+                if (ls->c > best)
+                    best = ls->c;
+
+                if (tid == 0)
+                    printf("%lld\n", best);
             }
 
 #pragma omp barrier
@@ -204,7 +219,7 @@ int main(int argc, char **argv)
     int valid = graph_validate(g.N, g.V, g.E);
     printf("Graph valid %d |V|=%d, |E|=%d IS=%lld\n", valid, g.N, g.V[g.N] / 2, is);
 
-    int *S = run_ls_par(g, IS, 500, 4, 10);
+    int *S = run_ls_par(g, IS, 10000, 16, 1000);
 
     // long long val = mwis_validate(g, S);
     // printf("%s %lld\n", argv[1], val);
