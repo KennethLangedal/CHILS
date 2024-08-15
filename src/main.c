@@ -6,6 +6,16 @@
 #include "local_search.h"
 #include "mwis.h"
 
+static inline int compare(const void *a, const void *b)
+{
+    return *(int *)a - *(int *)b;
+}
+
+static inline int compare_r(const void *a, const void *b, void *c)
+{
+    return ((int *)c)[*(int *)a] - ((int *)c)[*(int *)b];
+}
+
 graph reduction(graph g, long long *offset)
 {
     *offset = 0;
@@ -49,6 +59,85 @@ graph reduction(graph g, long long *offset)
     return sg;
 }
 
+void explore(graph g, local_search *ls, int k, int verbose)
+{
+    int c = 0, t = 0;
+    double t0 = omp_get_wtime();
+
+    long long best = ls->c;
+
+    int inc = 0, exc = 0;
+
+    int ref = ls->lc;
+
+    while (c++ < k)
+    {
+
+        int _inc = 0, _exc = 0;
+
+        ls->lc = ref;
+        int p = ls->lc;
+
+        int u = rand() % g.N;
+        while (ls->T[u])
+            u = rand() % g.N;
+
+        if (ls->IS[u])
+            _exc++;
+        else
+            _inc++;
+
+        if (ls->IS[u])
+            local_search_remove_vertex_tabu(g, ls, u);
+        else
+            local_search_add_vertex_tabu(g, ls, u);
+
+        int r = rand() % 4;
+        for (int i = 0; i < r && ls->qc > 0; i++)
+        {
+            int v = ls->Q[rand() % ls->qc];
+            int q = 0;
+            while (q++ < 100 && ls->T[v])
+                v = ls->Q[rand() % ls->qc];
+
+            if (q == 100)
+                continue;
+
+            if (ls->IS[v])
+                _exc++;
+            else
+                _inc++;
+
+            if (ls->IS[v])
+                local_search_remove_vertex(g, ls, v);
+            else
+                local_search_add_vertex(g, ls, v);
+        }
+
+        local_search_greedy(g, ls);
+
+        if (ls->c > best)
+        {
+            t++;
+            best = ls->c;
+            inc += _inc;
+            exc += _exc;
+            if (verbose)
+            {
+                printf("\r%lld %.2lf %d %d %d %d    ", ls->c, omp_get_wtime() - t0, c, t, inc, exc);
+                fflush(stdout);
+            }
+        }
+        else if (ls->c < best)
+        {
+            local_search_unwind(g, ls, p);
+        }
+        local_search_unwind_tabu(g, ls, p);
+    }
+    if (verbose)
+        printf("\n");
+}
+
 int *run_ls(graph g, int *IS, int rp, int k, long long offset)
 {
     local_search *ls = local_search_init(g);
@@ -59,69 +148,38 @@ int *run_ls(graph g, int *IS, int rp, int k, long long offset)
 
     local_search_greedy(g, ls);
 
-    long long best = ls->c;
-    int c = 0, t = 0;
+    for (int i = 0; i < g.N; i++)
+        ls->P[i] = 0;
 
-    double t0 = omp_get_wtime();
+    explore(g, ls, k, 1);
 
-    while (c++ < k && omp_get_wtime() - t0 < 3600.0)
+    int *P = malloc(sizeof(int) * g.N);
+    for (int i = 0; i < g.N; i++)
+        P[i] = i;
+
+    local_search *lsr = local_search_init(g);
+
+    qsort_r(P, g.N, sizeof(int), compare_r, ls->P);
+
+    for (int i = 0; i < g.N / 2; i++)
     {
-        ls->lc = 0;
-        int p = ls->lc;
-
-        int u = rand() % g.N;
-        // while (ls->IS[u] || ls->T[u])
-        //     u = rand() % g.N;
-
-        ls->T[u] = 1;
-        if (ls->IS[u])
-        {
-            local_search_remove_vertex(g, ls, u);
-        }
-        else
-        {
-            local_search_add_vertex(g, ls, u);
-            for (int i = g.V[u]; i < g.V[u + 1]; i++)
-                ls->T[g.E[i]] = 1;
-        }
-
-        int r = rand() % rp;
-        for (int i = 0; i < r && ls->qc > 0; i++)
-        {
-            int v = ls->Q[rand() % ls->qc], _t = 0;
-            while (ls->T[v] && _t++ < 100)
-                v = ls->Q[rand() % ls->qc];
-
-            if (ls->IS[v])
-                local_search_remove_vertex(g, ls, v);
-            else
-                local_search_add_vertex(g, ls, v);
-        }
-
-        local_search_greedy(g, ls);
-
-        ls->T[u] = 0;
-        if (ls->IS[u])
-            for (int i = g.V[u]; i < g.V[u + 1]; i++)
-                ls->T[g.E[i]] = 0;
-
-        if (ls->c > best)
-        {
-            t++;
-            best = ls->c;
-            // printf("\r%lld %.2lf %d %d %d  ", ls->c + offset, omp_get_wtime() - t0, c, t, ls->lc);
-            // fflush(stdout);
-        }
-        else if (ls->c < best)
-        {
-            local_search_unwind(g, ls, p);
-        }
+        if (ls->IS[P[i]])
+            local_search_add_vertex_tabu(g, lsr, P[i]);
     }
-    // printf("\n");
 
     int *S = malloc(sizeof(int) * g.N);
     for (int i = 0; i < g.N; i++)
         S[i] = ls->IS[i];
+
+    qsort(ls->P, g.N, sizeof(int), compare);
+
+    for (int i = 0; i < 30; i++)
+        printf("%d ", ls->P[i]);
+    printf("\n");
+
+    for (int i = 0; i < 30; i++)
+        printf("%d ", ls->P[g.N - 1 - i]);
+    printf("\n");
 
     local_search_free(ls);
 
@@ -147,11 +205,11 @@ int main(int argc, char **argv)
         fclose(f);
     }
 
-    // long long is = mwis_validate(g, IS);
-    // int valid = graph_validate(g.N, g.V, g.E);
-    // printf("Graph valid %d |V|=%d, |E|=%d IS=%lld\n", valid, g.N, g.V[g.N] / 2, is);
+    long long is = mwis_validate(g, IS);
+    int valid = graph_validate(g.N, g.V, g.E);
+    printf("Graph valid %d |V|=%d, |E|=%d IS=%lld\n", valid, g.N, g.V[g.N] / 2, is);
 
-    int *S = run_ls(g, IS, 3, 1000000000, 0);
+    int *S = run_ls(g, IS, 8, 4000000, 0);
 
     long long val = mwis_validate(g, S);
     printf("%s %lld\n", argv[1], val);
