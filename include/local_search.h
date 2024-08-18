@@ -5,7 +5,7 @@
 #define REMOVE 0
 #define ADD 1
 
-#define MAX_LOG 1000000
+#define MAX_LOG 10000000
 
 typedef struct
 {
@@ -15,16 +15,16 @@ typedef struct
 
     // Search structures
     int qc;
-    int *NW, *T, *_T, *P, *Q, *C, *_Q, *_C;
+    int *NW, *T, *_T, *P, *_P, *Q, *C, *_Q, *_C;
 
     // Action log
     int lc;
     int *A, *L;
 
-    // Add rand_r
+    unsigned int seed;
 } local_search;
 
-local_search *local_search_init(graph g);
+local_search *local_search_init(graph g, unsigned int seed);
 
 void local_search_free(local_search *ls);
 
@@ -35,6 +35,8 @@ void local_search_remove_vertex(graph g, local_search *ls, int u);
 void local_search_lock_vertex(graph g, local_search *ls, int u);
 
 void local_search_unlock_vertex(graph g, local_search *ls, int u);
+
+void local_search_aap(graph g, local_search *ls, int u);
 
 void local_search_greedy(graph g, local_search *ls);
 

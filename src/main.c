@@ -36,37 +36,52 @@ void explore(graph g, local_search *ls, int k, int nr, int verbose)
         ls->lc = ref;
         int p = ls->lc;
 
-        int u = rand() % g.N;
+        int u = rand_r(&ls->seed) % g.N;
         while (ls->T[u])
-            u = rand() % g.N;
+            u = rand_r(&ls->seed) % g.N;
 
-        if (ls->IS[u])
-            local_search_remove_vertex(g, ls, u);
-        else
-            local_search_add_vertex(g, ls, u);
-
-        local_search_lock_vertex(g, ls, u);
-
-        int r = rand() % nr;
-        for (int i = 0; i < r && ls->qc > 0; i++)
+        if (ls->P[u] == 1)
         {
-            int v = ls->Q[rand() % ls->qc];
-            int q = 0;
-            while (q++ < 100 && ls->T[v])
-                v = ls->Q[rand() % ls->qc];
+            local_search_aap(g, ls, u);
 
-            if (q == 100)
-                continue;
-
-            if (ls->IS[v])
-                local_search_remove_vertex(g, ls, v);
-            else
-                local_search_add_vertex(g, ls, v);
+            local_search_greedy(g, ls);
         }
+        else
+        {
+            if (ls->IS[u])
+                local_search_remove_vertex(g, ls, u);
+            else
+                local_search_add_vertex(g, ls, u);
 
-        local_search_greedy(g, ls);
+            local_search_lock_vertex(g, ls, u);
 
-        local_search_unlock_vertex(g, ls, u);
+            int r = rand_r(&ls->seed) % nr;
+            for (int i = 0; i < r && ls->qc > 0; i++)
+            {
+                int v = ls->Q[rand_r(&ls->seed) % ls->qc];
+                int q = 0;
+                while (q++ < 100 && ls->T[v])
+                    v = ls->Q[rand_r(&ls->seed) % ls->qc];
+
+                if (q == 100)
+                    continue;
+
+                if (ls->IS[v])
+                    local_search_remove_vertex(g, ls, v);
+                else
+                    local_search_add_vertex(g, ls, v);
+            }
+
+            local_search_greedy(g, ls);
+
+            local_search_unlock_vertex(g, ls, u);
+
+            if (!ls->IS[u] && ls->NW[u] < g.W[u])
+            {
+                local_search_add_vertex(g, ls, u);
+                local_search_greedy(g, ls);
+            }
+        }
 
         if (ls->c > best)
         {
@@ -100,18 +115,20 @@ int *run_ls_par(graph g, int *IS, int k, int nr, int it)
         int tid = omp_get_thread_num();
         int nt = omp_get_num_threads();
 
-        local_search *ls = local_search_init(g);
+        local_search *ls = local_search_init(g, tid);
 
-        explore(g, ls, k, nr, tid == 0);
+        for (int i = 0; i < g.N; i++)
+            if (IS[i])
+                local_search_add_vertex(g, ls, i);
+
+        explore(g, ls, k, nr, tid == -1);
 
 #pragma omp barrier
-        // #pragma omp critical
-        //         {
-        //             printf("Loced 0, tid %d: %lld\n", tid, ls->c);
-        //         }
 
         for (int i = 0; i < it; i++)
         {
+
+#pragma omp barrier
 #pragma omp single
             {
                 for (int j = 0; j < g.N; j++)
@@ -128,7 +145,7 @@ int *run_ls_par(graph g, int *IS, int k, int nr, int it)
             int nl = 0;
             for (int j = 0; j < g.N; j++)
             {
-                if (C[j] == nt) // (rand() % 2) == 0
+                if (C[j] == nt)
                 {
                     local_search_lock_vertex(g, ls, j);
                     for (int _j = g.V[j]; _j < g.V[j + 1]; _j++)
@@ -137,30 +154,27 @@ int *run_ls_par(graph g, int *IS, int k, int nr, int it)
                 }
             }
 
-            explore(g, ls, k * 5, nr, tid == 0);
+            explore(g, ls, k * 5, nr, tid == -1);
 
 #pragma omp barrier
-
-            // #pragma omp critical
-            //             {
-            //                 printf("Loced %d, tid %d: %lld\n", nl, tid, ls->c);
-            //             }
 
             for (int j = 0; j < g.N; j++)
                 ls->T[j] = 0;
 
-            explore(g, ls, k, nr, tid == 0);
+            explore(g, ls, k, nr, tid == -1);
 
 #pragma omp barrier
+
+            int validated_size = mwis_validate(g, ls->IS);
 
 #pragma omp critical
             {
 
-                if (ls->c > best)
-                    best = ls->c;
+                if (validated_size > best)
+                    best = validated_size;
 
                 if (tid == 0)
-                    printf("%lld\n", best);
+                    printf("%lld %d\n", best, i);
             }
 
 #pragma omp barrier
@@ -172,9 +186,9 @@ int *run_ls_par(graph g, int *IS, int k, int nr, int it)
     return NULL;
 }
 
-int *run_ls(graph g, int *IS, int rp, int k, long long offset)
+int *run_ls(graph g, int *IS, int k, int nr)
 {
-    local_search *ls = local_search_init(g);
+    local_search *ls = local_search_init(g, 0);
 
     for (int i = 0; i < g.N; i++)
         if (IS[i])
@@ -182,10 +196,7 @@ int *run_ls(graph g, int *IS, int rp, int k, long long offset)
 
     local_search_greedy(g, ls);
 
-    for (int i = 0; i < g.N; i++)
-        ls->P[i] = 0;
-
-    explore(g, ls, k, rp, 1);
+    explore(g, ls, k, nr, 1);
 
     int *S = malloc(sizeof(int) * g.N);
     for (int i = 0; i < g.N; i++)
@@ -206,9 +217,9 @@ int main(int argc, char **argv)
     for (int i = 0; i < g.N; i++)
         IS[i] = 0;
 
-    if (argc > 2)
+    if (argc > 4)
     {
-        f = fopen(argv[2], "r");
+        f = fopen(argv[4], "r");
         int u;
         while (fscanf(f, "%d\n", &u) == 1)
             IS[u - 1] = 1;
@@ -216,13 +227,15 @@ int main(int argc, char **argv)
     }
 
     long long is = mwis_validate(g, IS);
-    int valid = graph_validate(g.N, g.V, g.E);
+    int valid = 1; // graph_validate(g.N, g.V, g.E);
     printf("Graph valid %d |V|=%d, |E|=%d IS=%lld\n", valid, g.N, g.V[g.N] / 2, is);
 
-    int *S = run_ls_par(g, IS, 10000, 16, 1000);
+    int it = atoi(argv[2]);
+    int nr = atoi(argv[3]);
+
+    int *S = run_ls_par(g, IS, it, nr, 1000000);
 
     // long long val = mwis_validate(g, S);
-    // printf("%s %lld\n", argv[1], val);
 
     free(IS);
     free(S);

@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
-local_search *local_search_init(graph g)
+local_search *local_search_init(graph g, unsigned int seed)
 {
     local_search *ls = malloc(sizeof(local_search));
 
@@ -15,6 +15,7 @@ local_search *local_search_init(graph g)
     ls->T = malloc(sizeof(int) * g.N);
     ls->_T = malloc(sizeof(int) * g.N);
     ls->P = malloc(sizeof(int) * g.N);
+    ls->_P = malloc(sizeof(int) * g.N);
     ls->Q = malloc(sizeof(int) * g.N);
     ls->C = malloc(sizeof(int) * g.N);
     ls->_Q = malloc(sizeof(int) * g.N);
@@ -24,6 +25,8 @@ local_search *local_search_init(graph g)
     ls->A = malloc(sizeof(int) * MAX_LOG);
     ls->L = malloc(sizeof(int) * MAX_LOG);
 
+    ls->seed = seed;
+
     for (int u = 0; u < g.N; u++)
     {
         ls->IS[u] = 0;
@@ -31,6 +34,7 @@ local_search *local_search_init(graph g)
         ls->T[u] = 0;
         ls->_T[u] = 0;
         ls->P[u] = 0;
+        ls->_P[u] = 0;
         ls->Q[u] = u;
         ls->C[u] = 1;
         ls->_Q[u] = 0;
@@ -45,9 +49,13 @@ void local_search_free(local_search *ls)
     free(ls->IS);
     free(ls->NW);
     free(ls->T);
+    free(ls->_T);
     free(ls->P);
+    free(ls->_P);
     free(ls->Q);
     free(ls->C);
+    free(ls->_Q);
+    free(ls->_C);
     free(ls->A);
     free(ls->L);
     free(ls);
@@ -59,7 +67,6 @@ void local_search_add_vertex(graph g, local_search *ls, int u)
 
     ls->A[ls->lc] = ADD;
     ls->L[ls->lc++] = u;
-    ls->P[u]++;
 
     ls->IS[u] = 1;
     ls->c += g.W[u];
@@ -76,6 +83,7 @@ void local_search_add_vertex(graph g, local_search *ls, int u)
         if (ls->IS[v])
             local_search_remove_vertex(g, ls, v);
         ls->NW[v] += g.W[u];
+        ls->P[v]++;
     }
 }
 
@@ -83,13 +91,15 @@ void local_search_undo_add_vertex(graph g, local_search *ls, int u)
 {
     assert(ls->IS[u] == 1);
 
-    ls->P[u]--;
-
     ls->IS[u] = 0;
     ls->c -= g.W[u];
 
     for (int i = g.V[u]; i < g.V[u + 1]; i++)
-        ls->NW[g.E[i]] -= g.W[u];
+    {
+        int v = g.E[i];
+        ls->NW[v] -= g.W[u];
+        ls->P[v]--;
+    }
 }
 
 void local_search_remove_vertex(graph g, local_search *ls, int u)
@@ -98,7 +108,6 @@ void local_search_remove_vertex(graph g, local_search *ls, int u)
 
     ls->A[ls->lc] = REMOVE;
     ls->L[ls->lc++] = u;
-    ls->P[u]++;
 
     ls->IS[u] = 0;
     ls->c -= g.W[u];
@@ -113,6 +122,7 @@ void local_search_remove_vertex(graph g, local_search *ls, int u)
     {
         int v = g.E[i];
         ls->NW[v] -= g.W[u];
+        ls->P[v]--;
 
         if (!ls->C[v] && !ls->T[v])
         {
@@ -126,13 +136,15 @@ void local_search_undo_remove_vertex(graph g, local_search *ls, int u)
 {
     assert(ls->IS[u] == 0);
 
-    ls->P[u]--;
-
     ls->IS[u] = 1;
     ls->c += g.W[u];
 
     for (int i = g.V[u]; i < g.V[u + 1]; i++)
-        ls->NW[g.E[i]] += g.W[u];
+    {
+        int v = g.E[i];
+        ls->NW[v] += g.W[u];
+        ls->P[v]++;
+    }
 }
 
 void local_search_lock_vertex(graph g, local_search *ls, int u)
@@ -194,12 +206,121 @@ void local_search_two_one(graph g, local_search *ls, int u)
     }
 }
 
+void local_search_aap(graph g, local_search *ls, int u)
+{
+    assert(ls->IS[u] == 0 && ls->P[u] == 1);
+
+    int nc = 0;
+    ls->_T[nc++] = u;
+    ls->_P[u] = 1;
+
+    int c = -1;
+
+    for (int i = g.V[u]; i < g.V[u + 1]; i++)
+    {
+        int v = g.E[i];
+        if (ls->IS[v])
+        {
+            c = v;
+            ls->_T[nc++] = v;
+            break;
+        }
+    }
+
+    int found = 1;
+    while (found)
+    {
+        found = 0;
+        int best = -9999999;
+        int w, x;
+
+        for (int i = g.V[c]; i < g.V[c + 1]; i++)
+        {
+            int v = g.E[i];
+            if (ls->P[v] == 2 && !ls->_P[v])
+            {
+                int val = 1, next = -1;
+                for (int j = g.V[v]; j < g.V[v + 1]; j++)
+                {
+                    int w = g.E[j];
+                    if (w == c)
+                        continue;
+
+                    if (ls->_P[w])
+                    {
+                        val = 0;
+                        break;
+                    }
+                    if (ls->IS[w])
+                        next = w;
+                }
+
+                int gain = (rand_r(&ls->seed) % (1 << 16)) - (1 << 15);
+                if (val && (g.W[v] - g.W[next]) + gain > best)
+                {
+                    w = v;
+                    x = next;
+                    best = (g.W[v] - g.W[next]) + gain;
+                    found = 1;
+                }
+            }
+        }
+
+        if (found)
+        {
+            ls->_T[nc++] = w;
+            ls->_P[w] = 1;
+            ls->_T[nc++] = x;
+            c = x;
+        }
+    }
+
+    long long diff = 0, best = 0;
+    int best_n = 0;
+    int to_add = 0;
+
+    for (int i = 0; i < nc; i++)
+    {
+        int v = ls->_T[i];
+        if (ls->IS[v] && !ls->_P[v])
+        {
+            diff -= g.W[v];
+            ls->_P[v] = 1;
+        }
+        else if (!ls->IS[v])
+        {
+            diff += g.W[v];
+            ls->_T[to_add++] = v;
+        }
+
+        if (ls->IS[v] && diff > best)
+        {
+            best = diff;
+            best_n = to_add;
+        }
+    }
+
+    for (int i = 0; i < best_n; i++)
+    {
+        int v = ls->_T[i];
+        local_search_add_vertex(g, ls, v);
+    }
+
+    for (int i = 0; i < nc; i++)
+        ls->_P[ls->_T[i]] = 0;
+
+    return;
+
+    if (best > 0)
+        printf("\n%d %lld\n", best_n, best);
+}
+
 void local_search_shuffle_queue(local_search *ls)
 {
     int n = ls->qc;
     for (int i = 0; i < n - 1; i++)
     {
-        int j = i + rand() / (RAND_MAX / (n - i) + 1);
+        int j = i + rand_r(&ls->seed) / (RAND_MAX / (n - i) + 1);
         int t = ls->Q[j];
         ls->Q[j] = ls->Q[i];
         ls->Q[i] = t;
