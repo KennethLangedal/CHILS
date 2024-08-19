@@ -89,7 +89,7 @@ void explore(graph g, local_search *ls, int k, int nr, int verbose)
             best = ls->c;
             if (verbose)
             {
-                printf("\r%lld %.2lf %d %d    ", ls->c, omp_get_wtime() - t0, c, t);
+                printf("\r%lld %.2lf %d %d %d    ", ls->c, omp_get_wtime() - t0, c, t, nr);
                 fflush(stdout);
             }
         }
@@ -235,7 +235,11 @@ int main(int argc, char **argv)
 
     int *S = run_ls_par(g, IS, it, nr, 1000000);
 
-    // long long val = mwis_validate(g, S);
+    // int *S = run_ls(g, IS, it, nr);
+
+    long long val = mwis_validate(g, S);
+
+    printf("%lld\n", val);
 
     free(IS);
     free(S);
