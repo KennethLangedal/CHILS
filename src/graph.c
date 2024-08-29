@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 
-static inline void parse_id(char *data, size_t *p, int *v)
+static inline void parse_id(char *data, size_t *p, long long *v)
 {
     while (data[*p] < '0' || data[*p] > '9')
         (*p)++;
@@ -22,7 +22,7 @@ graph graph_parse(FILE *f)
     char *data = mmap(0, size, PROT_READ, MAP_PRIVATE, fileno_unlocked(f), 0);
     size_t p = 0;
 
-    int N, M, t;
+    long long N, M, t;
     parse_id(data, &p, &N);
     parse_id(data, &p, &M);
     parse_id(data, &p, &t);
@@ -30,7 +30,7 @@ graph graph_parse(FILE *f)
     int *V = malloc(sizeof(int) * (N + 1));
     int *E = malloc(sizeof(int) * (M * 2));
 
-    int *W = malloc(sizeof(int) * N);
+    long long *W = malloc(sizeof(long long) * N);
 
     int ei = 0;
     for (int u = 0; u < N; u++)
@@ -43,8 +43,10 @@ graph graph_parse(FILE *f)
                 p++;
             if (data[p] == '\n')
                 break;
-            parse_id(data, &p, E + ei);
-            E[ei++]--;
+            
+            long long e;
+            parse_id(data, &p, &e);
+            E[ei++] = e - 1;;
         }
         p++;
     }
@@ -118,7 +120,7 @@ graph graph_subgraph(graph g, int *mask, int *rm)
     graph sg = {.N = N};
     sg.V = malloc(sizeof(int) * (g.N + 1));
     sg.E = malloc(sizeof(int) * M);
-    sg.W = malloc(sizeof(int) * g.N);
+    sg.W = malloc(sizeof(long long) * g.N);
 
     M = 0;
     for (int u = 0; u < g.N; u++)

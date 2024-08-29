@@ -5,7 +5,7 @@ typedef struct
 {
     int N;
     int *V, *E;
-    int *W;
+    long long *W;
 } graph;
 
 graph graph_parse(FILE *f);

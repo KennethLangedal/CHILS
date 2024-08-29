@@ -4,6 +4,7 @@
 
 #include "graph.h"
 #include "local_search.h"
+#include "reductions.h"
 #include "mwis.h"
 
 static inline int compare(const void *a, const void *b)
@@ -102,7 +103,7 @@ void explore(graph g, local_search *ls, int k, int nr, int verbose)
         printf("\n");
 }
 
-int *run_ls_par(graph g, int *IS, int k, int nr, int it)
+int *run_ls_par(graph g, int *IS, int k, int nr, int it, long long offset)
 {
     int *C = malloc(sizeof(int) * g.N);
     for (int i = 0; i < g.N; i++)
@@ -165,7 +166,7 @@ int *run_ls_par(graph g, int *IS, int k, int nr, int it)
 
 #pragma omp barrier
 
-            int validated_size = mwis_validate(g, ls->IS);
+            long long validated_size = mwis_validate(g, ls->IS);
 
 #pragma omp critical
             {
@@ -174,7 +175,7 @@ int *run_ls_par(graph g, int *IS, int k, int nr, int it)
                     best = validated_size;
 
                 if (tid == 0)
-                    printf("%lld %d\n", best, i);
+                    printf("%lld %d\n", best + offset, i);
             }
 
 #pragma omp barrier
@@ -228,12 +229,74 @@ int main(int argc, char **argv)
 
     long long is = mwis_validate(g, IS);
     int valid = 1; // graph_validate(g.N, g.V, g.E);
-    printf("Graph valid %d |V|=%d, |E|=%d IS=%lld\n", valid, g.N, g.V[g.N] / 2, is);
+    // printf("Graph valid %d |V|=%d, |E|=%d IS=%lld\n", valid, g.N, g.V[g.N] / 2, is);
+
+    void *R = reduction_init(g.N, g.V[g.N]);
+    int *A = malloc(sizeof(int) * g.N);
+    for (int i = 0; i < g.N; i++)
+        A[i] = 1;
+
+    int any = 1, n = 0;
+    is = 0;
+    while (any)
+    {
+        any = 0;
+        for (int u = 0; u < g.N; u++)
+        {
+            int r = reduction_neighborhood_csr(R, g.N, g.V, g.E, g.W, A, u);
+            if (!r)
+                continue;
+
+            // printf("Can reduce %d NH\n", u);
+
+            any = 1;
+            IS[u] = 1;
+            is += g.W[u];
+            A[u] = 0;
+            for (int i = g.V[u]; i < g.V[u + 1]; i++)
+            {
+                if (A[g.E[i]])
+                {
+                    A[g.E[i]] = 0;
+                    n++;
+                }
+            }
+            n++;
+        }
+
+        for (int u = 0; u < g.N; u++)
+        {
+            // if ((u & 255) == 255)
+            // {
+            //     printf("\r%d/%d, %d/%d      ", u, g.N, n, g.N);
+            //     fflush(stdout);
+            // }
+            int r = reduction_unconfined_csr(R, g.N, g.V, g.E, g.W, A, u);
+            if (!r)
+                continue;
+
+            // printf("Can reduce %d UC\n", u);
+
+            any = 1;
+            A[u] = 0;
+            n++;
+        }
+        // printf("\n");
+
+        // printf("%d\n", n);
+    }
+
+    printf("%s %d/%d %lld (%.2f%%)\n", argv[1], n, g.N, is, ((double)n / (double)g.N) * 100.0);
+
+    return 0;
+
+    int *rm = malloc(sizeof(int) * g.N);
+    graph _g = graph_subgraph(g, A, rm);
 
     int it = atoi(argv[2]);
     int nr = atoi(argv[3]);
 
-    int *S = run_ls_par(g, IS, it, nr, 1000000);
+    int *S = run_ls_par(_g, IS, it, nr, 1000000, is);
 
     // int *S = run_ls(g, IS, it, nr);
 
