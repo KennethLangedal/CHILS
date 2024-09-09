@@ -13,7 +13,7 @@ static inline void parse_id(char *data, size_t *p, long long *v)
         *v = (*v) * 10 + data[(*p)++] - '0';
 }
 
-graph graph_parse(FILE *f)
+graph *graph_parse(FILE *f)
 {
     fseek(f, 0, SEEK_END);
     size_t size = ftell(f);
@@ -43,10 +43,11 @@ graph graph_parse(FILE *f)
                 p++;
             if (data[p] == '\n')
                 break;
-            
+
             long long e;
             parse_id(data, &p, &e);
-            E[ei++] = e - 1;;
+            E[ei++] = e - 1;
+            ;
         }
         p++;
     }
@@ -54,14 +55,19 @@ graph graph_parse(FILE *f)
 
     munmap(data, size);
 
-    return (graph){.N = N, .V = V, .E = E, .W = W};
+    graph *g = malloc(sizeof(graph));
+    *g = (graph){.N = N, .V = V, .E = E, .W = W};
+
+    return g;
 }
 
-void graph_free(graph g)
+void graph_free(graph *g)
 {
-    free(g.V);
-    free(g.E);
-    free(g.W);
+    free(g->V);
+    free(g->E);
+    free(g->W);
+
+    free(g);
 }
 
 static inline int compare(const void *a, const void *b)
@@ -69,79 +75,83 @@ static inline int compare(const void *a, const void *b)
     return (*(int *)a - *(int *)b);
 }
 
-int graph_validate(int N, const int *V, const int *E)
+int graph_validate(graph *g)
 {
     int M = 0;
-    for (int u = 0; u < N; u++)
+    for (int u = 0; u < g->N; u++)
     {
-        if (V[u + 1] - V[u] < 0)
+        if (g->V[u + 1] - g->V[u] < 0)
             return 0;
 
-        M += V[u + 1] - V[u];
+        M += g->V[u + 1] - g->V[u];
 
-        for (int i = V[u]; i < V[u + 1]; i++)
+        for (int i = g->V[u]; i < g->V[u + 1]; i++)
         {
-            if (i < 0 || i >= V[N])
+            if (i < 0 || i >= g->V[g->N])
                 return 0;
 
-            int v = E[i];
-            if (v < 0 || v >= N || v == u || (i > V[u] && v <= E[i - 1]))
+            int v = g->E[i];
+            if (v < 0 || v >= g->N || v == u || (i > g->V[u] && v <= g->E[i - 1]))
                 return 0;
 
-            if (bsearch(&u, E + V[v], V[v + 1] - V[v], sizeof(int), compare) == NULL)
+            if (bsearch(&u, g->E + g->V[v], g->V[v + 1] - g->V[v], sizeof(int), compare) == NULL)
                 return 0;
         }
     }
 
-    if (M != V[N])
+    if (M != g->V[g->N])
         return 0;
 
     return 1;
 }
 
-graph graph_subgraph(graph g, int *mask, int *rm)
+graph *graph_subgraph(graph *g, int *mask, int *reverse_mapping)
 {
-    int *fm = malloc(sizeof(int) * g.N);
+    int *forward_mapping = malloc(sizeof(int) * g->N);
     int N = 0, M = 0;
-    for (int u = 0; u < g.N; u++)
+    for (int u = 0; u < g->N; u++)
     {
         if (!mask[u])
             continue;
 
-        fm[u] = N;
-        rm[N] = u;
+        forward_mapping[u] = N;
+        reverse_mapping[N] = u;
         N++;
 
-        for (int i = g.V[u]; i < g.V[u + 1]; i++)
-            if (mask[g.E[i]])
+        for (int i = g->V[u]; i < g->V[u + 1]; i++)
+            if (mask[g->E[i]])
                 M++;
     }
 
-    graph sg = {.N = N};
-    sg.V = malloc(sizeof(int) * (g.N + 1));
-    sg.E = malloc(sizeof(int) * M);
-    sg.W = malloc(sizeof(long long) * g.N);
+    graph *sg = malloc(sizeof(graph));
+    *sg = (graph){.N = N};
+
+    sg->V = malloc(sizeof(int) * (N + 1));
+    sg->E = malloc(sizeof(int) * M);
+    sg->W = malloc(sizeof(long long) * N);
 
     M = 0;
-    for (int u = 0; u < g.N; u++)
+    for (int u = 0; u < g->N; u++)
     {
         if (!mask[u])
             continue;
 
-        sg.W[fm[u]] = g.W[u];
-        sg.V[fm[u]] = M;
+        sg->W[forward_mapping[u]] = g->W[u];
+        sg->V[forward_mapping[u]] = M;
 
-        for (int i = g.V[u]; i < g.V[u + 1]; i++)
+        for (int i = g->V[u]; i < g->V[u + 1]; i++)
         {
-            int v = g.E[i];
+            int v = g->E[i];
             if (!mask[v])
                 continue;
 
-            sg.E[M] = fm[v];
+            sg->E[M] = forward_mapping[v];
             M++;
         }
     }
-    sg.V[sg.N] = M;
-    free(fm);
+    sg->V[sg->N] = M;
+
+    free(forward_mapping);
+
     return sg;
 }

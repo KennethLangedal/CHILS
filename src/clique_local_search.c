@@ -22,9 +22,7 @@ clique_local_search *clique_local_search_init(clique_graph *g, unsigned int seed
     ls->prev_queue = malloc(sizeof(int) * g->NC);
     ls->in_prev_queue = malloc(sizeof(int) * g->NC);
 
-    ls->fsc = 0;
     ls->clique_status = malloc(sizeof(int) * g->NC);
-    ls->fast_set = malloc(sizeof(int) * g->N);
 
     ls->log_count = 0;
     ls->log = malloc(sizeof(int) * MAX_LOG);
@@ -35,7 +33,6 @@ clique_local_search *clique_local_search_init(clique_graph *g, unsigned int seed
     for (int u = 0; u < g->N; u++)
     {
         ls->independent_set[u] = 0;
-        ls->fast_set[u] = -1;
     }
 
     for (int c = 0; c < g->NC; c++)
@@ -61,7 +58,6 @@ void clique_local_search_free(clique_local_search *ls)
     free(ls->in_prev_queue);
 
     free(ls->clique_status);
-    free(ls->fast_set);
 
     free(ls->log);
     free(ls->action);
@@ -231,12 +227,10 @@ void clique_local_search_greedy(clique_graph *g, clique_local_search *ls)
     }
 }
 
-void clique_local_search_explore(clique_graph *g, clique_local_search *ls, int it, int k, int verbose)
+void clique_local_search_explore(clique_graph *g, clique_local_search *ls, int it, int verbose)
 {
     int c = 0, t = 0;
     long long best = ls->cost;
-
-    int ref = ls->log_count;
 
     if (verbose)
     {
@@ -247,8 +241,7 @@ void clique_local_search_explore(clique_graph *g, clique_local_search *ls, int i
     int q;
     while (c++ < it)
     {
-        ls->log_count = ref;
-        int p = ls->log_count;
+        ls->log_count = 0;
 
         int u = rand_r(&ls->seed) % g->N;
 
@@ -257,8 +250,8 @@ void clique_local_search_explore(clique_graph *g, clique_local_search *ls, int i
         else
             clique_local_search_add_vertex(g, ls, u);
 
-        int r = rand_r(&ls->seed) % k;
-        for (int i = 0; i < r && ls->queue_count > 0; i++)
+        int to_remove = (__builtin_clz(((unsigned int)rand_r(&ls->seed)) + 1) - 1) * 2;
+        for (int i = 0; i < to_remove && ls->queue_count > 0; i++)
         {
             int c = ls->queue[rand_r(&ls->seed) % ls->queue_count];
             int v = g->EC[g->C[c] + (rand_r(&ls->seed) % (g->C[c + 1] - g->C[c]))];
@@ -283,7 +276,7 @@ void clique_local_search_explore(clique_graph *g, clique_local_search *ls, int i
         }
         else if (ls->cost < best)
         {
-            clique_local_search_unwind(g, ls, p);
+            clique_local_search_unwind(g, ls, 0);
         }
     }
     if (verbose)

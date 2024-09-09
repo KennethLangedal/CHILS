@@ -8,10 +8,10 @@ typedef struct
     long long *W;
 } graph;
 
-graph graph_parse(FILE *f);
+graph *graph_parse(FILE *f);
 
-void graph_free(graph g);
+void graph_free(graph *g);
 
-int graph_validate(int N, const int *V, const int *E);
+int graph_validate(graph *g);
 
-graph graph_subgraph(graph g, int *mask, int *rm);
+graph *graph_subgraph(graph *g, int *mask, int *reverse_mapping);

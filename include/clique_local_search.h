@@ -14,8 +14,7 @@ typedef struct
     int *prev_queue, *in_prev_queue;
 
     // Graph structures
-    int fsc;
-    int *clique_status, *fast_set;
+    int *clique_status;
 
     // Action log
     int log_count;
@@ -36,6 +35,6 @@ void clique_local_search_remove_vertex(clique_graph *g, clique_local_search *ls,
 
 void clique_local_search_greedy(clique_graph *g, clique_local_search *ls);
 
-void clique_local_search_explore(clique_graph *g, clique_local_search *ls, int it, int k, int verbose);
+void clique_local_search_explore(clique_graph *g, clique_local_search *ls, int it, int verbose);
 
 void clique_local_search_unwind(clique_graph *g, clique_local_search *ls, int t);
