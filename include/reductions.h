@@ -1,5 +1,14 @@
 #pragma once
 
+/**
+ * Reduction rules for MWIS
+ * 
+ * Each rule returns:
+ *      1 if u can be included
+ *      -1 if u can be excluded
+ *      0 otherwise
+ **/
+
 void *reduction_init(int N, int M);
 
 void reduction_free(void *R);
