@@ -168,7 +168,7 @@ int main(int argc, char **argv)
 
     if (!verbose)
         printf("%s %d %d %lld %lld %lld\n", graph_path + path_offset,
-               g->N, g->E[g->N], w10, w50, w100);
+               g->N, g->V[g->N] / 2, w10, w50, w100);
 
     if (solution_path != NULL)
     {
