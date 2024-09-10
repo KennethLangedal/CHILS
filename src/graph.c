@@ -94,8 +94,8 @@ int graph_validate(graph *g)
             if (v < 0 || v >= g->N || v == u || (i > g->V[u] && v <= g->E[i - 1]))
                 return 0;
 
-            if (bsearch(&u, g->E + g->V[v], g->V[v + 1] - g->V[v], sizeof(int), compare) == NULL)
-                return 0;
+            // if (bsearch(&u, g->E + g->V[v], g->V[v + 1] - g->V[v], sizeof(int), compare) == NULL)
+            //     return 0;
         }
     }
 

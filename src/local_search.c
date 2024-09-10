@@ -2,13 +2,15 @@
 
 #include <stdlib.h>
 #include <limits.h>
-#include <time.h>
 #include <assert.h>
+#include <omp.h>
 
 #define REMOVE 0
 #define ADD 1
 
 #define MAX_LOG 10000000
+#define MAX_GUESS 100
+#define MAX_TWO_ONE_DEGREE 64
 
 local_search *local_search_init(graph *g, unsigned int seed)
 {
@@ -170,22 +172,20 @@ void local_search_undo_remove_vertex(graph *g, local_search *ls, int u)
 
 void local_search_lock_vertex(graph *g, local_search *ls, int u)
 {
-    ls->tabu[u] = 1;
-    if (!ls->independent_set[u])
-        return;
+    assert(ls->independent_set[u]);
 
+    ls->tabu[u] = 1;
     for (int i = g->V[u]; i < g->V[u + 1]; i++)
-        ls->tabu[u] = 1;
+        ls->tabu[g->E[i]] = 1;
 }
 
 void local_search_unlock_vertex(graph *g, local_search *ls, int u)
 {
-    ls->tabu[u] = 0;
-    if (!ls->independent_set[u])
-        return;
+    assert(ls->independent_set[u]);
 
+    ls->tabu[u] = 0;
     for (int i = g->V[u]; i < g->V[u + 1]; i++)
-        ls->tabu[u] = 0;
+        ls->tabu[g->E[i]] = 0;
 }
 
 void local_search_two_one(graph *g, local_search *ls, int u)
@@ -194,7 +194,7 @@ void local_search_two_one(graph *g, local_search *ls, int u)
 
     int adjacent_count = 0;
     for (int i = g->V[u]; i < g->V[u + 1]; i++)
-        if (ls->tightness[g->E[i]] == 1)
+        if (ls->tightness[g->E[i]] == 1 && !ls->tabu[g->E[i]])
             ls->temp[adjacent_count++] = g->E[i];
 
     if (adjacent_count < 2)
@@ -239,7 +239,6 @@ void local_search_aap(graph *g, local_search *ls, int u)
     }
     else
     {
-        ls->mask[u] = 1;
         for (int i = g->V[u]; i < g->V[u + 1]; i++)
         {
             int v = g->E[i];
@@ -250,6 +249,10 @@ void local_search_aap(graph *g, local_search *ls, int u)
                 break;
             }
         }
+
+        if (ls->tabu[current])
+            return;
+        ls->mask[u] = 1;
     }
 
     int found = 1;
@@ -262,7 +265,7 @@ void local_search_aap(graph *g, local_search *ls, int u)
         for (int i = g->V[current]; i < g->V[current + 1]; i++)
         {
             int v = g->E[i];
-            if (ls->tightness[v] != 2 || ls->mask[v])
+            if (ls->tightness[v] != 2 || ls->mask[v] || ls->tabu[v])
                 continue;
 
             int valid = 1, next = -1;
@@ -279,7 +282,7 @@ void local_search_aap(graph *g, local_search *ls, int u)
             }
 
             long long gain = (rand_r(&ls->seed) % (1 << 16)) - (1 << 15);
-            if (valid && (g->W[v] - g->W[next]) + gain > best)
+            if (valid && !ls->tabu[next] && (g->W[v] - g->W[next]) + gain > best)
             {
                 to_add = v;
                 to_remove = next;
@@ -297,7 +300,7 @@ void local_search_aap(graph *g, local_search *ls, int u)
         }
     }
 
-    long long diff = LLONG_MIN, best = LLONG_MIN;
+    long long diff = 0, best = LLONG_MIN;
     int best_position = 0;
     int to_add = 0;
 
@@ -321,6 +324,9 @@ void local_search_aap(graph *g, local_search *ls, int u)
             best_position = to_add;
         }
     }
+
+    if (best <= 0)
+        best_position = to_add;
 
     for (int i = 0; i < best_position; i++)
     {
@@ -372,7 +378,7 @@ void local_search_greedy(graph *g, local_search *ls)
 
             if (!ls->independent_set[u] && ls->adjacent_weight[u] < g->W[u])
                 local_search_add_vertex(g, ls, u);
-            else if (ls->independent_set[u])
+            else if (ls->independent_set[u] && g->V[u + 1] - g->V[u] < MAX_TWO_ONE_DEGREE)
                 local_search_two_one(g, ls, u);
         }
 
@@ -385,25 +391,32 @@ void local_search_greedy(graph *g, local_search *ls)
 
 void local_search_explore(graph *g, local_search *ls, double tl, int verbose)
 {
-    int c = 1, t = 0, q = 0;
+    int c = 0, q = 0;
 
     long long best = ls->cost;
 
     if (verbose)
     {
-        printf("\r%lld %d %d 0.0    ", ls->cost, c, t);
+        printf("Running local search using %.2lf seconds\n", tl);
+        printf("\r%lld %.2lf  ", ls->cost, 0.0);
         fflush(stdout);
     }
 
-    time_t start, end;
-    start = time(NULL);
+    double start, end;
+    start = omp_get_wtime();
 
-    while (c++)
+    if (ls->cost == 0)
+        local_search_in_order_solution(g, ls);
+
+    local_search_greedy(g, ls);
+
+    while (1)
     {
-        if ((c & ((1 << 10) - 1)) == 0)
+        if ((c++ & ((1 << 10) - 1)) == 0)
         {
-            end = time(NULL);
-            double elapsed = difftime(end, start);
+            c = 0;
+            end = omp_get_wtime();
+            double elapsed = end - start;
             if (elapsed > tl)
                 break;
         }
@@ -412,7 +425,7 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose)
 
         int u = rand_r(&ls->seed) % g->N;
         q = 0;
-        while (q++ < 100 && ls->tabu[u])
+        while (q++ < MAX_GUESS && ls->tabu[u])
             u = rand_r(&ls->seed) % g->N;
 
         if (ls->tabu[u])
@@ -428,12 +441,12 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose)
         {
             local_search_add_vertex(g, ls, u);
 
-            int to_remove = (__builtin_clz(((unsigned int)rand_r(&ls->seed)) + 1) - 1) * 2;
+            int to_remove = (rand_r(&ls->seed) & 3) + (__builtin_clz(((unsigned int)rand_r(&ls->seed)) + 1) - 1);
             for (int i = 0; i < to_remove && ls->queue_count > 0; i++)
             {
                 int v = ls->queue[rand_r(&ls->seed) % ls->queue_count];
                 q = 0;
-                while (q++ < 100 && ls->tabu[v])
+                while (q++ < MAX_GUESS && ls->tabu[v])
                     v = ls->queue[rand_r(&ls->seed) % ls->queue_count];
 
                 if (ls->tabu[v])
@@ -450,14 +463,13 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose)
 
         if (ls->cost > best)
         {
-            t++;
             best = ls->cost;
             if (verbose)
             {
-                end = time(NULL);
-                double elapsed = difftime(end, start);
+                end = omp_get_wtime();
+                double elapsed = end - start;
 
-                printf("\r%lld %d %d %.2lf  ", ls->cost, c, t, elapsed);
+                printf("\r%lld %.2lf  ", ls->cost, elapsed);
                 fflush(stdout);
             }
         }

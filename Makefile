@@ -1,9 +1,9 @@
 SHELL = /bin/bash
 
 CC = gcc
-CFLAGS = -g -std=gnu17 -O3 -march=native -I include -D _GNU_SOURCE
+CFLAGS = -std=gnu17 -O3 -march=native -I include -fopenmp -DNDEBUG
 
-OBJ = main.o graph.o local_search.o mwis.o reductions.o kernelization.o clique_graph.o clique_local_search.o
+OBJ = main.o graph.o reductions.o local_search.o pils.o
 
 OBJ := $(addprefix bin/, $(OBJ))
 
@@ -13,11 +13,11 @@ DEP := $(sort $(DEP))
 vpath %.c src
 vpath %.h include
 
-all : MWIS
+all : PILS
 
 -include $(DEP:.o=.d)
 
-MWIS : $(OBJ)
+PILS : $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ -lm
 
 bin/%.o : %.c
@@ -25,6 +25,6 @@ bin/%.o : %.c
 
 .PHONY : clean
 clean :
-	rm -f MWIS
+	rm -f PILS
 	rm -f $(DEP)
 	rm -f $(DEP:.o=.d)
