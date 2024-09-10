@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <limits.h>
+#include <time.h>
 #include <assert.h>
 
 #define REMOVE 0
@@ -382,21 +383,31 @@ void local_search_greedy(graph *g, local_search *ls)
     }
 }
 
-void local_search_explore(graph *g, local_search *ls, int it, int verbose)
+void local_search_explore(graph *g, local_search *ls, double tl, int verbose)
 {
-    int c = 0, t = 0, q = 0;
-    int max_remove = 0;
+    int c = 1, t = 0, q = 0;
 
     long long best = ls->cost;
 
     if (verbose)
     {
-        printf("\r%lld %d %d    ", ls->cost, c, t);
+        printf("\r%lld %d %d 0.0    ", ls->cost, c, t);
         fflush(stdout);
     }
 
-    while (c++ < it)
+    time_t start, end;
+    start = time(NULL);
+
+    while (c++)
     {
+        if ((c & ((1 << 10) - 1)) == 0)
+        {
+            end = time(NULL);
+            double elapsed = difftime(end, start);
+            if (elapsed > tl)
+                break;
+        }
+
         ls->log_count = 0;
 
         int u = rand_r(&ls->seed) % g->N;
@@ -418,8 +429,6 @@ void local_search_explore(graph *g, local_search *ls, int it, int verbose)
             local_search_add_vertex(g, ls, u);
 
             int to_remove = (__builtin_clz(((unsigned int)rand_r(&ls->seed)) + 1) - 1) * 2;
-            if (to_remove > max_remove)
-                max_remove = to_remove;
             for (int i = 0; i < to_remove && ls->queue_count > 0; i++)
             {
                 int v = ls->queue[rand_r(&ls->seed) % ls->queue_count];
@@ -445,7 +454,10 @@ void local_search_explore(graph *g, local_search *ls, int it, int verbose)
             best = ls->cost;
             if (verbose)
             {
-                printf("\r%lld %d %d %d   ", ls->cost, c, t, max_remove);
+                end = time(NULL);
+                double elapsed = difftime(end, start);
+
+                printf("\r%lld %d %d %.2lf  ", ls->cost, c, t, elapsed);
                 fflush(stdout);
             }
         }
