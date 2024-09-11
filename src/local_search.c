@@ -184,8 +184,24 @@ void local_search_unlock_vertex(graph *g, local_search *ls, int u)
     assert(ls->independent_set[u]);
 
     ls->tabu[u] = 0;
+    if (!ls->in_queue[u])
+    {
+        ls->in_queue[u] = 1;
+        ls->queue[ls->queue_count] = u;
+        ls->queue_count++;
+    }
+
     for (int i = g->V[u]; i < g->V[u + 1]; i++)
-        ls->tabu[g->E[i]] = 0;
+    {
+        int v = g->E[i];
+        ls->tabu[v] = 0;
+        if (!ls->in_queue[v])
+        {
+            ls->in_queue[v] = 1;
+            ls->queue[ls->queue_count] = v;
+            ls->queue_count++;
+        }
+    }
 }
 
 void local_search_two_one(graph *g, local_search *ls, int u)
@@ -440,8 +456,9 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose)
         else
         {
             local_search_add_vertex(g, ls, u);
+            local_search_lock_vertex(g, ls, u);
 
-            int to_remove = (rand_r(&ls->seed) & 3) + (__builtin_clz(((unsigned int)rand_r(&ls->seed)) + 1) - 1);
+            int to_remove = __builtin_clz(((unsigned int)rand_r(&ls->seed)) + 1);
             for (int i = 0; i < to_remove && ls->queue_count > 0; i++)
             {
                 int v = ls->queue[rand_r(&ls->seed) % ls->queue_count];
@@ -458,6 +475,8 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose)
                     local_search_add_vertex(g, ls, v);
             }
 
+            local_search_greedy(g, ls);
+            local_search_unlock_vertex(g, ls, u);
             local_search_greedy(g, ls);
         }
 

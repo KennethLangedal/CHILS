@@ -97,8 +97,13 @@ void pils_run(graph *g, pils *p, double tl, int verbose)
 
 #pragma omp for
             for (int i = 0; i < g->N; i++)
+            {
+                if (p->C[i] < p->N)
+                    continue;
+
                 for (int j = 0; j < p->N; j++)
-                    p->LS[j]->tabu[i] = 0;
+                    local_search_unlock_vertex(g, p->LS[j], i);
+            }
 
 #pragma omp for
             for (int i = 0; i < p->N; i++)
