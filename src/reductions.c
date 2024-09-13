@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <limits.h>
+#include <assert.h>
+
+#define NUM_BUFFERS 4
 
 static inline void kernelization_push_queue_dist_one(const int *V, const int *E, const int *A, int u,
                                                      int Nr, int **in_queue, int **queue, int *queue_size)
@@ -25,7 +28,7 @@ static inline void kernelization_push_queue_dist_one(const int *V, const int *E,
 }
 
 void kernelize_csr(int N, const int *V, const int *E, const long long *W,
-                   int *A, int *IS, long long *offset, int Nr, ...)
+                   int *A, int *S, long long *offset, int Nr, ...)
 {
     va_list argptr;
     va_start(argptr, Nr);
@@ -75,7 +78,7 @@ void kernelize_csr(int N, const int *V, const int *E, const long long *W,
         if (res == 1)
         {
             A[u] = 0;
-            IS[u] = 1;
+            S[u] = 1;
             *offset += W[u];
 
             for (int i = V[u]; i < V[u + 1]; i++)
@@ -116,28 +119,28 @@ void kernelize_csr(int N, const int *V, const int *E, const long long *W,
     reduction_free(R);
 }
 
+// Buffers and bitvectors (should always be reset by reduction rule)
 typedef struct
 {
-    int *S, *NS, *T;
-    int *S_B, *NSI_B, *IS_B;
+    int Nb;
+    int **T, **TB;
 } reduction_data;
 
 void *reduction_init(int N, int M)
 {
     reduction_data *rp = malloc(sizeof(reduction_data));
 
-    rp->S = malloc(sizeof(int) * N);
-    rp->NS = malloc(sizeof(int) * N);
-    rp->T = malloc(sizeof(int) * N);
-    rp->S_B = malloc(sizeof(int) * N);
-    rp->NSI_B = malloc(sizeof(int) * N);
-    rp->IS_B = malloc(sizeof(int) * N);
+    rp->Nb = NUM_BUFFERS;
+    rp->T = malloc(sizeof(int *) * rp->Nb);
+    rp->TB = malloc(sizeof(int *) * rp->Nb);
 
-    for (int i = 0; i < N; i++)
+    for (int i = 0; i < rp->Nb; i++)
     {
-        rp->S_B[i] = 0;
-        rp->NSI_B[i] = 0;
-        rp->IS_B[i] = 0;
+        rp->T[i] = malloc(sizeof(int) * N);
+        rp->TB[i] = malloc(sizeof(int) * N);
+
+        for (int j = 0; j < N; j++)
+            rp->TB[i][j] = 0;
     }
 
     return rp;
@@ -147,134 +150,122 @@ void reduction_free(void *R)
 {
     reduction_data *rp = (reduction_data *)R;
 
-    free(rp->S);
-    free(rp->NS);
+    for (int i = 0; i < rp->Nb; i++)
+    {
+        free(rp->T[i]);
+        free(rp->TB[i]);
+    }
+
     free(rp->T);
-    free(rp->S_B);
-    free(rp->NSI_B);
-    free(rp->IS_B);
+    free(rp->TB);
+
     free(rp);
 }
 
 int reduction_neighborhood_csr(void *R, int N, const int *V, const int *E,
                                const long long *W, const int *A, int u)
 {
-    if (!A[u])
-        return 0;
+    assert(A[u]);
 
     long long nw = 0;
     for (int i = V[u]; i < V[u + 1]; i++)
         if (A[E[i]])
             nw += W[E[i]];
 
-    return nw <= W[u];
+    if (nw <= W[u])
+        return 1;
+    return 0;
 }
 
 int reduction_unconfined_csr(void *R, int N, const int *V, const int *E,
                              const long long *W, const int *A, int u)
 {
-    if (!A[u])
-        return 0;
+    assert(A[u]);
 
     reduction_data *rp = (reduction_data *)R;
 
     int n = 0, m = 0;
 
-    rp->S[n++] = u;
-    rp->S_B[u] = 1;
-    rp->NSI_B[u] = 1;
+    assert(rp->Nb >= 4);
+
+    int *S = rp->T[0], *NS = rp->T[1];
+    int *S_B = rp->TB[0], *NS_B = rp->TB[1], *NSI_B = rp->TB[1];
+
+    S[n++] = u;
+    S_B[u] = 1;
+    NSI_B[u] = 1;
     for (int i = V[u]; i < V[u + 1]; i++)
     {
-        if (!A[E[i]])
+        int v = E[i];
+        if (!A[v])
             continue;
-        rp->NS[m++] = E[i];
-        rp->NSI_B[E[i]] = 1;
+        NS[m++] = v;
+        NS_B[v] = 1;
+        NSI_B[v] = 1;
     }
 
     int res = 0, first = 1;
     while (m > 0)
     {
-        int v = rp->NS[--m];
-        if (rp->S_B[v])
+        int v = NS[--m];
+        NS_B[v] = 0;
+        if (S_B[v])
             continue;
 
         long long sw = 0;
         if (first)
-        {
             sw = W[u];
-        }
         else
-        {
             for (int i = V[v]; i < V[v + 1] && sw <= W[v]; i++)
-                if (A[E[i]] && rp->S_B[E[i]])
+                if (A[E[i]] && S_B[E[i]])
                     sw += W[E[i]];
-        }
 
         if (sw > W[v])
             continue;
 
-        int p = 0;
-        long long is = 0, min = LLONG_MAX;
-
-        for (int i = V[v]; i < V[v + 1] && sw + is - min <= W[v]; i++)
+        int xn = 0, x = -1;
+        long long ds = LLONG_MIN;
+        for (int i = V[v]; i < V[v + 1] && sw + ds <= W[v]; i++)
         {
             int w = E[i];
-            if (A[w] && !rp->NSI_B[w])
+            if (A[w] && !NSI_B[w])
             {
-                rp->T[p++] = w;
-                is += W[w];
-                rp->IS_B[w] = 1;
-                if (W[w] < min)
-                    min = W[w];
+                xn++;
+                x = w;
+                ds += W[w];
             }
         }
 
-        int ind = sw + is - min <= W[v];
-        for (int i = 0; i < p && ind; i++)
-        {
-            int w = rp->T[i];
-            for (int j = V[w]; j < V[w + 1] && ind; j++)
-                if (A[E[j]] && rp->IS_B[E[j]])
-                    ind = 0;
-        }
-
-        for (int i = 0; i < p; i++)
-            rp->IS_B[rp->T[i]] = 0;
-
-        if (ind && sw + is <= W[v]) // Can reduce u
+        if (sw + ds <= W[v]) // Can reduce u
         {
             res = 1;
             break;
         }
-        else if (ind && sw + is > W[v] && sw + is - min <= W[v]) // Extend S
+        else if (sw + ds > W[v] && xn == 1) // Extend S
         {
             first = 0;
-
-            for (int i = 0; i < p; i++)
+            S[n++] = x;
+            S_B[x] = 1;
+            NSI_B[x] = 1;
+            for (int j = V[x]; j < V[x + 1]; j++)
             {
-                int w = rp->T[i];
-
-                rp->S[n++] = w;
-                rp->S_B[w] = 1;
-                rp->NSI_B[w] = 1;
-                for (int j = V[w]; j < V[w + 1]; j++)
-                {
-                    if (!A[E[j]])
-                        continue;
-                    rp->NS[m++] = E[j];
-                    rp->NSI_B[E[j]] = 1;
-                }
+                int w = E[j];
+                if (!A[w] || NS_B[w])
+                    continue;
+                NS[m++] = w;
+                NS_B[w] = 1;
+                NSI_B[w] = 1;
             }
         }
     }
 
     for (int i = 0; i < n; i++)
     {
-        int v = rp->S[i];
+        int v = S[i];
         for (int j = V[v]; j < V[v + 1]; j++)
-            rp->NSI_B[E[j]] = 0;
-        rp->S_B[v] = 0;
-        rp->NSI_B[v] = 0;
+            NSI_B[E[j]] = 0;
+        S_B[v] = 0;
+        NSI_B[v] = 0;
     }
 
     return res;
