@@ -53,7 +53,7 @@ int reduction_unconfined_csr(reduction_data *R, int N, const int *V, const int *
 
         int xn = 0, x = -1;
         long long ds = 0;
-        for (int i = V[v]; i < V[v + 1]; i++)
+        for (int i = V[v]; i < V[v + 1] && (sw + ds <= W[v] || xn <= 1); i++)
         {
             int w = E[i];
             if (A[w] && !NSI_B[w])
