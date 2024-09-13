@@ -189,7 +189,7 @@ int reduction_unconfined_csr(void *R, int N, const int *V, const int *E,
     assert(rp->Nb >= 4);
 
     int *S = rp->T[0], *NS = rp->T[1];
-    int *S_B = rp->TB[0], *NS_B = rp->TB[1], *NSI_B = rp->TB[1];
+    int *S_B = rp->TB[0], *NS_B = rp->TB[1], *NSI_B = rp->TB[2];
 
     S[n++] = u;
     S_B[u] = 1;
@@ -224,8 +224,8 @@ int reduction_unconfined_csr(void *R, int N, const int *V, const int *E,
             continue;
 
         int xn = 0, x = -1;
-        long long ds = LLONG_MIN;
-        for (int i = V[v]; i < V[v + 1] && sw + ds <= W[v]; i++)
+        long long ds = 0;
+        for (int i = V[v]; i < V[v + 1]; i++)
         {
             int w = E[i];
             if (A[w] && !NSI_B[w])
@@ -247,9 +247,9 @@ int reduction_unconfined_csr(void *R, int N, const int *V, const int *E,
             S[n++] = x;
             S_B[x] = 1;
             NSI_B[x] = 1;
-            for (int j = V[x]; j < V[x + 1]; j++)
+            for (int i = V[x]; i < V[x + 1]; i++)
             {
-                int w = E[j];
+                int w = E[i];
                 if (!A[w] || NS_B[w])
                     continue;
                 NS[m++] = w;
@@ -257,6 +257,12 @@ int reduction_unconfined_csr(void *R, int N, const int *V, const int *E,
                 NSI_B[w] = 1;
             }
         }
+    }
+
+    while (m > 0)
+    {
+        int v = NS[--m];
+        NS_B[v] = 0;
     }
 
     for (int i = 0; i < n; i++)
@@ -268,5 +274,7 @@ int reduction_unconfined_csr(void *R, int N, const int *V, const int *E,
         NSI_B[v] = 0;
     }
 
-    return res;
+    if (res)
+        return -1;
+    return 0;
 }
