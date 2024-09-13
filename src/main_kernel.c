@@ -22,9 +22,12 @@ int main(int argc, char **argv)
         S[i] = 0;
     }
 
-    kernelize_csr(g->N, g->V, g->E, g->W, A, S, &offset, 2,
+    kernelize_csr(g->N, g->V, g->E, g->W, A, S, &offset, 4,
                   reduction_neighborhood_csr,
-                  reduction_unconfined_csr);
+                  reduction_clique_csr,
+                  reduction_domination_csr,
+                  reduction_unconfined_csr
+                  );
 
     int Nr = 0, Mr = 0;
     for (int u = 0; u < g->N; u++)

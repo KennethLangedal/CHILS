@@ -2,8 +2,16 @@
 
 #include <stdarg.h>
 
-typedef int (*reduction_ptr)(void *R, int N, const int *V, const int *E,
-                             const long long *W, const int *A, int u);
+// Buffers and bitvectors (should always be reset by reduction rule)
+typedef struct
+{
+    int Nb;
+    int **T, **TB;
+} reduction_data;
+
+
+typedef int (*reduction_ptr)(reduction_data *R, int N, const int *V, const int *E,
+                             const long long *W, const int *A, int u, int* Nr, int* reducable);
 
 void kernelize_csr(int N, const int *V, const int *E, const long long *W,
                    int *A, int *S, long long *offset, int Nr, ...);
@@ -17,12 +25,18 @@ void kernelize_csr(int N, const int *V, const int *E, const long long *W,
  *      -1 if u can be excluded
  **/
 
-void *reduction_init(int N, int M);
+reduction_data *reduction_init(int N, int M);
 
-void reduction_free(void *R);
+void reduction_free(reduction_data *R);
 
-int reduction_neighborhood_csr(void *R, int N, const int *V, const int *E,
-                               const long long *W, const int *A, int u);
+int reduction_neighborhood_csr(reduction_data *R, int N, const int *V, const int *E,
+                               const long long *W, const int *A, int u, int* nRed, int* reducable);
 
-int reduction_unconfined_csr(void *R, int N, const int *V, const int *E,
-                             const long long *W, const int *A, int u);
+int reduction_clique_csr(reduction_data *R, int N, const int *V, const int *E,
+                         const long long *W, const int *A, int u, int* nRed, int* reducable);
+
+int reduction_domination_csr(reduction_data *R, int N, const int *V, const int *E,
+                         const long long *W, const int *A, int u, int* nRed, int* reducable);
+
+int reduction_unconfined_csr(reduction_data *R, int N, const int *V, const int *E,
+                             const long long *W, const int *A, int u, int* nRed, int* reducable);
