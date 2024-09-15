@@ -48,6 +48,8 @@ int main(int argc, char **argv)
 
     printf("%d %d %lld\n", Nr, Mr / 2, offset);
 
+    free(A);
+    free(S);
     graph_free(g);
 
     return 0;
