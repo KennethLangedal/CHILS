@@ -34,6 +34,9 @@ int reduction_neighborhood_csr(reduction_data *R, int N, const int *V, const int
 int reduction_clique_csr(reduction_data *R, int N, const int *V, const int *E,
                          const long long *W, const int *A, int u, int *nRed, int *reducable);
 
+int reduction_twin_csr(reduction_data *R, int N, const int *V, const int *E,
+                       const long long *W, const int *A, int u, int *nRed, int *reducable);
+
 int reduction_domination_csr(reduction_data *R, int N, const int *V, const int *E,
                              const long long *W, const int *A, int u, int *nRed, int *reducable);
 
