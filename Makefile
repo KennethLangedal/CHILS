@@ -6,7 +6,8 @@ CFLAGS = -std=gnu17 -O3 -march=native -I include -fopenmp -DNDEBUG
 OBJ_PILS = main_pils.o graph.o reductions.o local_search.o pils.o \
 		   neighborhood.o unconfined.o
 OBJ_KERNEL = main_kernel.o graph.o reductions.o \
-			 clique.o unconfined.o neighborhood.o domination.o
+			 clique.o unconfined.o neighborhood.o domination.o \
+			 single_edge.o extended_single_edge.o
 
 OBJ_PILS := $(addprefix bin/, $(OBJ_PILS))
 OBJ_KERNEL := $(addprefix bin/, $(OBJ_KERNEL))
