@@ -5,7 +5,7 @@
 #include <limits.h>
 #include <assert.h>
 
-int reduction_twin_csr(reduction_data *R, int N, const int *V, const int *E,
+int reduction_extended_twin_csr(reduction_data *R, int N, const int *V, const int *E,
                        const long long *W, const int *A, int u, int *nRed, int *reducable)
 {
     assert(A[u]);
@@ -37,18 +37,19 @@ int reduction_twin_csr(reduction_data *R, int N, const int *V, const int *E,
     // check the neighborhood of min degree neighbor for twin candidates
     for (int i = V[min_deg_neighbor]; i < V[min_deg_neighbor + 1]; i++)
     {
-        if (A[E[i]] && E[i] != u && !neighborhood_set[E[i]] && V[E[i] + 1] - V[E[i]] >= deg_u)
+        if (A[E[i]] && E[i] != u && !neighborhood_set[E[i]])
             candidates[n_candidates++] = E[i];
     }
 
-    // check if twin candidates are actual twins i.e. have the same neighborhood
+    // check if twin candidates are extended twins i.e. N[twin] subset N[u] 
     for (int i = 0; i < n_candidates; i++)
     {
         int twin = candidates[i];
-        if (W[twin] + W[u] < neighborhood_weight) // not needed when folding (TODO)
+        if (W[twin] + W[u] < neighborhood_weight)
             continue;
 
         int twin_neighbor_count = 0;
+        assert(A[twin]);
         int is_twin = 1;
         for (int j = V[twin]; j < V[twin + 1]; j++)
         {
@@ -62,12 +63,16 @@ int reduction_twin_csr(reduction_data *R, int N, const int *V, const int *E,
                 break;
             }
         }
-        if (!is_twin || twin_neighbor_count != deg_u)
+        if (!is_twin) 
             continue;
 
-        *nRed = 2;
-        reducable[0] = u;
-        reducable[1] = twin;
+        *nRed = 1;
+        reducable[0] = twin;
+        if (twin_neighbor_count == deg_u) // actual twin -> also include u
+        {
+            *nRed = 2;
+            reducable[1] = u;
+        }
 
         for (int i = V[u]; i < V[u + 1]; i++)
             neighborhood_set[E[i]] = 0;

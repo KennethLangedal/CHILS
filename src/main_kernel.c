@@ -22,12 +22,14 @@ int main(int argc, char **argv)
         S[i] = 0;
     }
 
-    kernelize_csr(g->N, g->V, g->E, g->W, A, S, &offset, 6,
+    kernelize_csr(g->N, g->V, g->E, g->W, A, S, &offset, 7,
                   reduction_neighborhood_csr,
                   reduction_clique_csr,
                   reduction_domination_csr,
                   reduction_single_edge_csr,
                   reduction_extended_single_edge_csr,
+                //   reduction_twin_csr, 
+                  reduction_extended_twin_csr, // includes twin
                   reduction_unconfined_csr
                   );
 
