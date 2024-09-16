@@ -405,7 +405,7 @@ void local_search_greedy(graph *g, local_search *ls)
     }
 }
 
-void local_search_explore(graph *g, local_search *ls, double tl, int verbose)
+void local_search_explore(graph *g, local_search *ls, double tl, int verbose, int offset)
 {
     int c = 0, q = 0;
 
@@ -414,7 +414,7 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose)
     if (verbose)
     {
         printf("Running local search using %.2lf seconds\n", tl);
-        printf("\r%lld %.2lf  ", ls->cost, 0.0);
+        printf("\r%lld %.2lf  ", ls->cost + offset, 0.0);
         fflush(stdout);
     }
 
@@ -488,7 +488,7 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose)
                 end = omp_get_wtime();
                 double elapsed = end - start;
 
-                printf("\r%lld %.2lf  ", ls->cost, elapsed);
+                printf("\r%lld %.2lf  ", ls->cost + offset, elapsed);
                 fflush(stdout);
             }
         }

@@ -39,7 +39,7 @@ void pils_free(pils *p)
     free(p);
 }
 
-void pils_run(graph *g, pils *p, double tl, int verbose)
+void pils_run(graph *g, pils *p, double tl, int verbose, int offset)
 {
     double start, end;
     start = omp_get_wtime();
@@ -52,7 +52,7 @@ void pils_run(graph *g, pils *p, double tl, int verbose)
         for (int i = 0; i < p->N; i++)
             if (p->LS[i]->cost > best)
                 best = p->LS[i]->cost;
-        printf("\r%lld %.2lf   ", best, 0.0);
+        printf("\r%lld %.2lf   ", best + offset, 0.0);
         fflush(stdout);
     }
 
@@ -93,7 +93,7 @@ void pils_run(graph *g, pils *p, double tl, int verbose)
 
 #pragma omp for
             for (int i = 0; i < p->N; i++)
-                local_search_explore(g, p->LS[i], p->step_reduced, 0);
+                local_search_explore(g, p->LS[i], p->step_reduced, 0, offset);
 
 #pragma omp for
             for (int i = 0; i < g->N; i++)
@@ -107,7 +107,7 @@ void pils_run(graph *g, pils *p, double tl, int verbose)
 
 #pragma omp for
             for (int i = 0; i < p->N; i++)
-                local_search_explore(g, p->LS[i], p->step_full, 0);
+                local_search_explore(g, p->LS[i], p->step_full, 0, offset);
 
             end = omp_get_wtime();
             elapsed = end - start;
@@ -120,7 +120,7 @@ void pils_run(graph *g, pils *p, double tl, int verbose)
                         if (p->LS[i]->cost > best)
                             best = p->LS[i]->cost;
 
-                    printf("\r%lld %.2lf   ", best, elapsed);
+                    printf("\r%lld %.2lf   ", best + offset, elapsed);
                     fflush(stdout);
                 }
             }

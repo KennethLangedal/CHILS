@@ -129,6 +129,7 @@ int main(int argc, char **argv)
     double t10 = timeout * 0.1, t50 = timeout * 0.4, t100 = timeout * 0.5;
 
     int *solution = malloc(sizeof(int) * g->N);
+    int offset = 0;
 
     if (run_pils > 0)
     {
@@ -136,12 +137,12 @@ int main(int argc, char **argv)
         p->step_full = step;
         p->step_reduced = step;
 
-        pils_run(g, p, t10, verbose);
-        w10 = mwis_validate(g, pils_get_best_independent_set(p));
-        pils_run(g, p, t50, verbose);
-        w50 = mwis_validate(g, pils_get_best_independent_set(p));
-        pils_run(g, p, t100, verbose);
-        w100 = mwis_validate(g, pils_get_best_independent_set(p));
+        pils_run(g, p, t10, verbose, offset);
+        w10 = mwis_validate(g, pils_get_best_independent_set(p)) + offset;
+        pils_run(g, p, t50, verbose, offset);
+        w50 = mwis_validate(g, pils_get_best_independent_set(p)) + offset;
+        pils_run(g, p, t100, verbose, offset);
+        w100 = mwis_validate(g, pils_get_best_independent_set(p)) + offset;
 
         int *best = pils_get_best_independent_set(p);
         for (int i = 0; i < g->N; i++)
@@ -153,12 +154,12 @@ int main(int argc, char **argv)
     {
         local_search *ls = local_search_init(g, time(NULL));
 
-        local_search_explore(g, ls, t10, verbose);
-        w10 = mwis_validate(g, ls->independent_set);
-        local_search_explore(g, ls, t50, verbose);
-        w50 = mwis_validate(g, ls->independent_set);
-        local_search_explore(g, ls, t100, verbose);
-        w100 = mwis_validate(g, ls->independent_set);
+        local_search_explore(g, ls, t10, verbose, offset);
+        w10 = mwis_validate(g, ls->independent_set) + offset;
+        local_search_explore(g, ls, t50, verbose, offset);
+        w50 = mwis_validate(g, ls->independent_set) + offset;
+        local_search_explore(g, ls, t100, verbose, offset);
+        w100 = mwis_validate(g, ls->independent_set) + offset;
 
         for (int i = 0; i < g->N; i++)
             solution[i] = ls->independent_set[i];

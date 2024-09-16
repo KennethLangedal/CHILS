@@ -15,6 +15,6 @@ pils *pils_init(graph *g, int N);
 
 void pils_free(pils *p);
 
-void pils_run(graph *g, pils *p, double tl, int verbose);
+void pils_run(graph *g, pils *p, double tl, int verbose, int offset);
 
 int *pils_get_best_independent_set(pils *p);
