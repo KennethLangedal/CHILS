@@ -61,6 +61,19 @@ graph *graph_parse(FILE *f)
     return g;
 }
 
+// store graph in metis format
+void graph_store(FILE *f, graph *g)
+{
+    fprintf(f, "%d %d 10\n", g->N, g->V[g->N] / 2);
+    for (int u = 0; u < g->N; u++)
+    {
+        fprintf(f, "%lld", g->W[u]);
+        for (int i = g->V[u]; i < g->V[u + 1]; i++)
+            fprintf(f, " %d", g->E[i] + 1);
+        fprintf(f, "\n");
+    }
+}
+
 void graph_free(graph *g)
 {
     free(g->V);

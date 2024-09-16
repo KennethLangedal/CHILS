@@ -10,6 +10,8 @@ typedef struct
 
 graph *graph_parse(FILE *f);
 
+void graph_store(FILE *f, graph *g);
+
 void graph_free(graph *g);
 
 int graph_validate(graph *g);
