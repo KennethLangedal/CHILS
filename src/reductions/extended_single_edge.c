@@ -40,7 +40,7 @@ int reduction_extended_single_edge_csr(reduction_data *R, int N, const int *V, c
             if (neighborhood_set[E[j]])
             {
                 reducable[n++] = E[j];
-                neighborhood_set[E[j]] = 0; // to make sure not to exclude twice
+                neighborhood_set[E[j]] = 0; 
                 neighborhood_weight -= W[E[j]];
             }
         }
