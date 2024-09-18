@@ -76,6 +76,9 @@ void graph_store(FILE *f, graph *g)
 
 void graph_free(graph *g)
 {
+    if (g == NULL)
+        return;
+        
     free(g->V);
     free(g->E);
     free(g->W);

@@ -16,7 +16,7 @@ typedef int (*reduction_ptr)(reduction_data *R, int N, const int *V, const int *
                              const long long *W, const int *A, int u, int *Nr, int *reducable);
 
 void kernelize_csr(int N, const int *V, const int *E, const long long *W,
-                   int *A, int *S, long long *offset, int Nr, ...);
+                   int *A, int *S, long long *offset, double tl, int Nr, ...);
 
 /**
  * Reduction rules for MWIS

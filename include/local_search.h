@@ -42,6 +42,6 @@ void local_search_aap(graph *g, local_search *ls, int u);
 
 void local_search_greedy(graph *g, local_search *ls);
 
-void local_search_explore(graph *g, local_search *ls, double tl, int verbose, int offset);
+void local_search_explore(graph *g, local_search *ls, double tl, int verbose, long long offset);
 
 void local_search_unwind(graph *g, local_search *ls, int t);

@@ -10,7 +10,7 @@
 
 #define MAX_LOG 10000000
 #define MAX_GUESS 100
-#define MAX_TWO_ONE_DEGREE 64
+#define MAX_TWO_ONE_DEGREE 256
 
 local_search *local_search_init(graph *g, unsigned int seed)
 {
@@ -80,7 +80,7 @@ void local_search_in_order_solution(graph *g, local_search *ls)
 {
     for (int u = 0; u < g->N; u++)
     {
-        if (ls->adjacent_weight[u] < g->W[u])
+        if (!ls->tabu[u] && ls->adjacent_weight[u] < g->W[u])
             local_search_add_vertex(g, ls, u);
     }
 }
@@ -172,30 +172,30 @@ void local_search_undo_remove_vertex(graph *g, local_search *ls, int u)
 
 void local_search_lock_vertex(graph *g, local_search *ls, int u)
 {
-    assert(ls->independent_set[u]);
-
-    ls->tabu[u] = 1;
-    for (int i = g->V[u]; i < g->V[u + 1]; i++)
-        ls->tabu[g->E[i]] = 1;
+    ls->tabu[u]++;
+    if (ls->independent_set[u])
+        for (int i = g->V[u]; i < g->V[u + 1]; i++)
+            ls->tabu[g->E[i]]++;
 }
 
 void local_search_unlock_vertex(graph *g, local_search *ls, int u)
 {
-    assert(ls->independent_set[u]);
-
-    ls->tabu[u] = 0;
-    if (!ls->in_queue[u])
+    ls->tabu[u]--;
+    if (!ls->in_queue[u] && !ls->tabu[u])
     {
         ls->in_queue[u] = 1;
         ls->queue[ls->queue_count] = u;
         ls->queue_count++;
     }
+    if (!ls->independent_set[u])
+        return;
 
     for (int i = g->V[u]; i < g->V[u + 1]; i++)
     {
         int v = g->E[i];
-        ls->tabu[v] = 0;
-        if (!ls->in_queue[v])
+        ls->tabu[v]--;
+
+        if (!ls->in_queue[v] && !ls->tabu[v])
         {
             ls->in_queue[v] = 1;
             ls->queue[ls->queue_count] = v;
@@ -206,7 +206,7 @@ void local_search_unlock_vertex(graph *g, local_search *ls, int u)
 
 void local_search_two_one(graph *g, local_search *ls, int u)
 {
-    assert(ls->independent_set[u]);
+    assert(ls->independent_set[u] && !ls->tabu[u]);
 
     int adjacent_count = 0;
     for (int i = g->V[u]; i < g->V[u + 1]; i++)
@@ -297,7 +297,7 @@ void local_search_aap(graph *g, local_search *ls, int u)
                     next = w;
             }
 
-            long long gain = (rand_r(&ls->seed) % (1 << 16)) - (1 << 15);
+            long long gain = (rand_r(&ls->seed) % (1 << 10)) - (1 << 9);
             if (valid && !ls->tabu[next] && (g->W[v] - g->W[next]) + gain > best)
             {
                 to_add = v;
@@ -405,7 +405,7 @@ void local_search_greedy(graph *g, local_search *ls)
     }
 }
 
-void local_search_explore(graph *g, local_search *ls, double tl, int verbose, int offset)
+void local_search_explore(graph *g, local_search *ls, double tl, int verbose, long long offset)
 {
     int c = 0, q = 0;
 
@@ -413,7 +413,7 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose, in
 
     if (verbose)
     {
-        printf("Running local search using %.2lf seconds\n", tl);
+        printf("Running local search for %.2lf seconds\n", tl);
         printf("\r%lld %.2lf  ", ls->cost + offset, 0.0);
         fflush(stdout);
     }
@@ -458,8 +458,9 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose, in
             local_search_add_vertex(g, ls, u);
             local_search_lock_vertex(g, ls, u);
 
-            int to_remove = __builtin_clz(((unsigned int)rand_r(&ls->seed)) + 1);
-            for (int i = 0; i < to_remove && ls->queue_count > 0; i++)
+            // int to_remove = __builtin_clz(((unsigned int)rand_r(&ls->seed)) + 1);
+            int to_remove = rand_r(&ls->seed) & 15;
+            for (int i = 0; i < to_remove && ls->queue_count > 0 && ls->queue_count < (1 << 12); i++)
             {
                 int v = ls->queue[rand_r(&ls->seed) % ls->queue_count];
                 q = 0;
@@ -483,6 +484,7 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose, in
         if (ls->cost > best)
         {
             best = ls->cost;
+            ls->log_count = 0;
             if (verbose)
             {
                 end = omp_get_wtime();
@@ -492,7 +494,7 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose, in
                 fflush(stdout);
             }
         }
-        else if (ls->cost < best)
+        if (ls->cost < best)
         {
             local_search_unwind(g, ls, 0);
         }

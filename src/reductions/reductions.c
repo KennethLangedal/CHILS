@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <limits.h>
 #include <assert.h>
+#include <omp.h>
 
 #define NUM_BUFFERS 4
 
@@ -28,7 +29,7 @@ static inline void kernelization_push_queue_dist_one(const int *V, const int *E,
 }
 
 void kernelize_csr(int N, const int *V, const int *E, const long long *W,
-                   int *A, int *S, long long *offset, int Nr, ...)
+                   int *A, int *S, long long *offset, double tl, int Nr, ...)
 {
     va_list argptr;
     va_start(argptr, Nr);
@@ -59,9 +60,10 @@ void kernelize_csr(int N, const int *V, const int *E, const long long *W,
     reduction_data *R = reduction_init(N, V[N]);
     int *reducable = malloc(sizeof(int) * N);
     int nRed = 0;
+    double start = omp_get_wtime(), elapsed = 0.0;
 
     int rr = 0;
-    while (rr < Nr)
+    while (rr < Nr && elapsed < tl)
     {
         if (queue_size[rr] == 0)
         {
@@ -93,9 +95,6 @@ void kernelize_csr(int N, const int *V, const int *E, const long long *W,
                     kernelization_push_queue_dist_one(V, E, A, E[i], Nr, in_queue, queue, queue_size);
                 }
             }
-
-            printf("\r%d  ", queue_size[1]);
-            fflush(stdout);
         }
         else if (res == -1)
         {
@@ -105,16 +104,14 @@ void kernelize_csr(int N, const int *V, const int *E, const long long *W,
                 A[reducable[i]] = 0;
                 kernelization_push_queue_dist_one(V, E, A, reducable[i], Nr, in_queue, queue, queue_size);
             }
-
-            printf("\r%d  ", queue_size[1]);
-            fflush(stdout);
         }
         nRed = 0;
 
         if (res != 0)
             rr = 0;
+
+        elapsed = omp_get_wtime() - start;
     }
-    printf("\n");
 
     free(reduction_rules);
 
@@ -140,6 +137,7 @@ reduction_data *reduction_init(int N, int M)
     rp->Nb = NUM_BUFFERS;
     rp->T = malloc(sizeof(int *) * rp->Nb);
     rp->TB = malloc(sizeof(int *) * rp->Nb);
+    rp->solver = tiny_solver_init(N);
 
     for (int i = 0; i < rp->Nb; i++)
     {
@@ -165,6 +163,7 @@ void reduction_free(reduction_data *R)
 
     free(rp->T);
     free(rp->TB);
+    tiny_solver_free(rp->solver);
 
     free(rp);
 }

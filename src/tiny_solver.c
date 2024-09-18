@@ -282,11 +282,14 @@ void tiny_solver_solve_neighbourhood(tiny_solver *solver, double tl, long long W
         for (int j = V[v]; j < V[v + 1]; j++)
         {
             int w = E[j];
+            if (w > v)
+                break;
             if (!A[w] || solver->forward_map[w] < 0 || solver->forward_map[w] >= N ||
                 solver->reverse_map[solver->forward_map[w]] != w)
                 continue;
 
             solver->subgraph[solver->forward_map[v]][solver->forward_map[w]] = 1;
+            solver->subgraph[solver->forward_map[w]][solver->forward_map[v]] = 1;
         }
     }
 
@@ -329,11 +332,14 @@ void tiny_solver_build_subgraph(tiny_solver *solver, int sN, const int *sV,
         for (int j = V[u]; j < V[u + 1]; j++)
         {
             int v = E[j];
+            if (v > u)
+                break;
             if (!A[v] || solver->forward_map[v] < 0 || solver->forward_map[v] >= N ||
                 solver->reverse_map[solver->forward_map[v]] != v)
                 continue;
 
             solver->subgraph[solver->forward_map[u]][solver->forward_map[v]] = 1;
+            solver->subgraph[solver->forward_map[v]][solver->forward_map[u]] = 1;
         }
     }
 }
