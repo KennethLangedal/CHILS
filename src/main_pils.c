@@ -202,7 +202,6 @@ int main(int argc, char **argv)
     double t10 = timeout * 0.1, t50 = timeout * 0.4, t100 = timeout * 0.5;
 
     int *solution = malloc(sizeof(int) * g->N);
-    int offset = 0;
 
     if (run_pils > 1)
     {

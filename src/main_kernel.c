@@ -45,7 +45,7 @@ int main(int argc, char **argv)
         S[i] = 0;
     }
 
-    kernelize_csr(g->N, g->V, g->E, g->W, A, S, &offset, 7,
+    kernelize_csr(g->N, g->V, g->E, g->W, A, S, &offset, 3600, 7,
                   reduction_neighborhood_csr,
                   reduction_clique_csr,
                   reduction_domination_csr,
@@ -83,8 +83,7 @@ int main(int argc, char **argv)
         if (run_pils > 0)
         {
             pils *p = pils_init(kernel, run_pils);
-            p->step_full = 1;
-            p->step_reduced = 1;
+            p->step = 1;
 
             pils_run(kernel, p, 10000, 1, offset);
             long long w = mwis_validate(kernel, pils_get_best_independent_set(p));
