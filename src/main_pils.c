@@ -211,10 +211,16 @@ int main(int argc, char **argv)
         if (initial_solution != NULL)
             pils_set_solution(g, p, initial_solution);
 
+        for (int i = 0; i < run_pils; i++)
+            p->LS[i]->remove_count = 4;
         pils_run(g, p, t10, verbose, offset);
         w10 = mwis_validate(g, pils_get_best_independent_set(p)) + offset;
+        for (int i = 0; i < run_pils; i++)
+            p->LS[i]->remove_count = 8;
         pils_run(g, p, t50, verbose, offset);
         w50 = mwis_validate(g, pils_get_best_independent_set(p)) + offset;
+        for (int i = 0; i < run_pils; i++)
+            p->LS[i]->remove_count = 16;
         pils_run(g, p, t100, verbose, offset);
         w100 = mwis_validate(g, pils_get_best_independent_set(p)) + offset;
 
@@ -228,10 +234,13 @@ int main(int argc, char **argv)
     {
         local_search *ls = local_search_init(g, 0);
 
+        ls->remove_count = 4;
         local_search_explore(g, ls, t10, verbose, offset);
         w10 = mwis_validate(g, ls->independent_set) + offset;
+        ls->remove_count = 8;
         local_search_explore(g, ls, t50, verbose, offset);
         w50 = mwis_validate(g, ls->independent_set) + offset;
+        ls->remove_count = 16;
         local_search_explore(g, ls, t100, verbose, offset);
         w100 = mwis_validate(g, ls->independent_set) + offset;
 

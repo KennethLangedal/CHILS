@@ -21,7 +21,7 @@ typedef struct
     int log_count;
     int *log, *action;
 
-    unsigned int seed;
+    unsigned int seed, remove_count;
 } local_search;
 
 local_search *local_search_init(graph *g, unsigned int seed);

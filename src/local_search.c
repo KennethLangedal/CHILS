@@ -8,9 +8,9 @@
 #define REMOVE 0
 #define ADD 1
 
-#define MAX_LOG 10000000
-#define MAX_GUESS 100
-#define MAX_TWO_ONE_DEGREE 256
+#define MAX_LOG 1048576
+#define MAX_GUESS 512
+#define MAX_TWO_ONE_DEGREE 1024
 
 local_search *local_search_init(graph *g, unsigned int seed)
 {
@@ -36,6 +36,7 @@ local_search *local_search_init(graph *g, unsigned int seed)
     ls->action = malloc(sizeof(int) * MAX_LOG);
 
     ls->seed = seed;
+    ls->remove_count = 4;
 
     for (int u = 0; u < g->N; u++)
     {
@@ -297,7 +298,7 @@ void local_search_aap(graph *g, local_search *ls, int u)
                     next = w;
             }
 
-            long long gain = (rand_r(&ls->seed) % (1 << 10)) - (1 << 9);
+            long long gain = (rand_r(&ls->seed) % (1 << 30)) - (1 << 29);
             if (valid && !ls->tabu[next] && (g->W[v] - g->W[next]) + gain > best)
             {
                 to_add = v;
@@ -450,7 +451,6 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose, lo
         if (ls->independent_set[u] || ls->tightness[u] == 1)
         {
             local_search_aap(g, ls, u);
-
             local_search_greedy(g, ls);
         }
         else
@@ -458,9 +458,8 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose, lo
             local_search_add_vertex(g, ls, u);
             local_search_lock_vertex(g, ls, u);
 
-            // int to_remove = __builtin_clz(((unsigned int)rand_r(&ls->seed)) + 1);
-            int to_remove = rand_r(&ls->seed) & 15;
-            for (int i = 0; i < to_remove && ls->queue_count > 0 && ls->queue_count < (1 << 12); i++)
+            int to_remove = rand_r(&ls->seed) % ls->remove_count;
+            for (int i = 0; i < to_remove && ls->queue_count > 0 && ls->cost <= best; i++)
             {
                 int v = ls->queue[rand_r(&ls->seed) % ls->queue_count];
                 q = 0;
