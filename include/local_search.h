@@ -14,12 +14,13 @@ typedef struct
     int *prev_queue, *in_prev_queue;
 
     // Graph structures
+    int pool_size;
     long long *adjacent_weight;
-    int *tabu, *tightness, *temp, *mask;
+    int *tabu, *tightness, *temp, *mask, *pool;
 
     // Action log
     int log_count;
-    int *log, *action;
+    int *log;
 
     unsigned int seed, remove_count;
 } local_search;
@@ -30,9 +31,9 @@ void local_search_free(local_search *ls);
 
 void local_search_in_order_solution(graph *g, local_search *ls);
 
-void local_search_add_vertex(graph *g, local_search *ls, int u);
+void local_search_add_vertex(graph *g, local_search *ls, int u, int l);
 
-void local_search_remove_vertex(graph *g, local_search *ls, int u);
+void local_search_remove_vertex(graph *g, local_search *ls, int u, int l);
 
 void local_search_lock_vertex(graph *g, local_search *ls, int u);
 

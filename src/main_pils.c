@@ -141,10 +141,13 @@ int main(int argc, char **argv)
         fclose(f);
     }
 
-    int path_offset = 0;
+    int path_offset = 0, path_end = 0;
     for (int i = 0; graph_path[i] != '\0'; i++)
         if (graph_path[i] == '/')
             path_offset = i + 1;
+        else if (graph_path[i] == '.')
+            path_end = i;
+    graph_path[path_end] = '\0';
 
     if (verbose)
     {

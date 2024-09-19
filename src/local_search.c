@@ -5,9 +5,6 @@
 #include <assert.h>
 #include <omp.h>
 
-#define REMOVE 0
-#define ADD 1
-
 #define MAX_LOG 1048576
 #define MAX_GUESS 512
 #define MAX_TWO_ONE_DEGREE 1024
@@ -25,15 +22,16 @@ local_search *local_search_init(graph *g, unsigned int seed)
     ls->prev_queue = malloc(sizeof(int) * g->N);
     ls->in_prev_queue = malloc(sizeof(int) * g->N);
 
+    ls->pool_size = g->N;
     ls->adjacent_weight = malloc(sizeof(long long) * g->N);
     ls->tabu = malloc(sizeof(int) * g->N);
     ls->tightness = malloc(sizeof(int) * g->N);
     ls->temp = malloc(sizeof(int) * g->N * 2);
     ls->mask = malloc(sizeof(int) * g->N);
+    ls->pool = malloc(sizeof(int) * g->N);
 
     ls->log_count = 0;
     ls->log = malloc(sizeof(int) * MAX_LOG);
-    ls->action = malloc(sizeof(int) * MAX_LOG);
 
     ls->seed = seed;
     ls->remove_count = 4;
@@ -51,6 +49,7 @@ local_search *local_search_init(graph *g, unsigned int seed)
         ls->tightness[u] = 0;
         ls->temp[u] = 0;
         ls->mask[u] = 0;
+        ls->pool[u] = u;
     }
 
     return ls;
@@ -70,9 +69,9 @@ void local_search_free(local_search *ls)
     free(ls->tightness);
     free(ls->temp);
     free(ls->mask);
+    free(ls->pool);
 
     free(ls->log);
-    free(ls->action);
 
     free(ls);
 }
@@ -82,54 +81,41 @@ void local_search_in_order_solution(graph *g, local_search *ls)
     for (int u = 0; u < g->N; u++)
     {
         if (!ls->tabu[u] && ls->adjacent_weight[u] < g->W[u])
-            local_search_add_vertex(g, ls, u);
+            local_search_add_vertex(g, ls, u, 0);
     }
 }
 
-void local_search_add_vertex(graph *g, local_search *ls, int u)
+void local_search_add_vertex(graph *g, local_search *ls, int u, int l)
 {
     assert(!ls->independent_set[u] && !ls->tabu[u]);
 
-    ls->action[ls->log_count] = ADD;
-    ls->log[ls->log_count] = u;
-    ls->log_count++;
-
     ls->independent_set[u] = 1;
     ls->cost += g->W[u];
+
+    if (!ls->in_queue[u])
+    {
+        ls->in_queue[u] = 1;
+        ls->queue[ls->queue_count] = u;
+        ls->queue_count++;
+    }
 
     for (int i = g->V[u]; i < g->V[u + 1]; i++)
     {
         int v = g->E[i];
         if (ls->independent_set[v])
-            local_search_remove_vertex(g, ls, v);
+            local_search_remove_vertex(g, ls, v, l);
 
         ls->adjacent_weight[v] += g->W[u];
         ls->tightness[v]++;
     }
 }
 
-void local_search_undo_add_vertex(graph *g, local_search *ls, int u)
+void local_search_remove_vertex(graph *g, local_search *ls, int u, int l)
 {
     assert(ls->independent_set[u] && !ls->tabu[u]);
 
-    ls->independent_set[u] = 0;
-    ls->cost -= g->W[u];
-
-    for (int i = g->V[u]; i < g->V[u + 1]; i++)
-    {
-        int v = g->E[i];
-        ls->adjacent_weight[v] -= g->W[u];
-        ls->tightness[v]--;
-    }
-}
-
-void local_search_remove_vertex(graph *g, local_search *ls, int u)
-{
-    assert(ls->independent_set[u] && !ls->tabu[u]);
-
-    ls->action[ls->log_count] = REMOVE;
-    ls->log[ls->log_count] = u;
-    ls->log_count++;
+    if (l)
+        ls->log[ls->log_count++] = u;
 
     ls->independent_set[u] = 0;
     ls->cost -= g->W[u];
@@ -153,21 +139,6 @@ void local_search_remove_vertex(graph *g, local_search *ls, int u)
             ls->queue[ls->queue_count] = v;
             ls->queue_count++;
         }
-    }
-}
-
-void local_search_undo_remove_vertex(graph *g, local_search *ls, int u)
-{
-    assert(!ls->independent_set[u] && !ls->tabu[u]);
-
-    ls->independent_set[u] = 1;
-    ls->cost += g->W[u];
-
-    for (int i = g->V[u]; i < g->V[u + 1]; i++)
-    {
-        int v = g->E[i];
-        ls->adjacent_weight[v] += g->W[u];
-        ls->tightness[v]++;
     }
 }
 
@@ -233,8 +204,8 @@ void local_search_two_one(graph *g, local_search *ls, int u)
                 i1++;
             else if (g->W[w1] + g->W[v] > g->W[u])
             {
-                local_search_add_vertex(g, ls, v);
-                local_search_add_vertex(g, ls, w1);
+                local_search_add_vertex(g, ls, v, 1);
+                local_search_add_vertex(g, ls, w1, 1);
                 return;
             }
             else
@@ -348,7 +319,7 @@ void local_search_aap(graph *g, local_search *ls, int u)
     for (int i = 0; i < best_position; i++)
     {
         int v = ls->temp[g->N + i];
-        local_search_add_vertex(g, ls, v);
+        local_search_add_vertex(g, ls, v, 1);
     }
 
     for (int i = 0; i < candidate_size; i++)
@@ -394,7 +365,7 @@ void local_search_greedy(graph *g, local_search *ls)
                 continue;
 
             if (!ls->independent_set[u] && ls->adjacent_weight[u] < g->W[u])
-                local_search_add_vertex(g, ls, u);
+                local_search_add_vertex(g, ls, u, 1);
             else if (ls->independent_set[u] && g->V[u + 1] - g->V[u] < MAX_TWO_ONE_DEGREE)
                 local_search_two_one(g, ls, u);
         }
@@ -440,10 +411,10 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose, lo
 
         ls->log_count = 0;
 
-        int u = rand_r(&ls->seed) % g->N;
+        int u = ls->pool[rand_r(&ls->seed) % ls->pool_size];
         q = 0;
         while (q++ < MAX_GUESS && ls->tabu[u])
-            u = rand_r(&ls->seed) % g->N;
+            u = ls->pool[rand_r(&ls->seed) % ls->pool_size];
 
         if (ls->tabu[u])
             continue;
@@ -455,10 +426,10 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose, lo
         }
         else
         {
-            local_search_add_vertex(g, ls, u);
+            local_search_add_vertex(g, ls, u, 1);
             local_search_lock_vertex(g, ls, u);
 
-            int to_remove = rand_r(&ls->seed) % ls->remove_count;
+            int to_remove = __builtin_clz(((unsigned int)rand_r(&ls->seed)) + 1);
             for (int i = 0; i < to_remove && ls->queue_count > 0 && ls->cost <= best; i++)
             {
                 int v = ls->queue[rand_r(&ls->seed) % ls->queue_count];
@@ -470,9 +441,9 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose, lo
                     continue;
 
                 if (ls->independent_set[v])
-                    local_search_remove_vertex(g, ls, v);
+                    local_search_remove_vertex(g, ls, v, 1);
                 else
-                    local_search_add_vertex(g, ls, v);
+                    local_search_add_vertex(g, ls, v, 1);
             }
 
             local_search_greedy(g, ls);
@@ -508,11 +479,8 @@ void local_search_unwind(graph *g, local_search *ls, int t)
     {
         ls->log_count--;
         int u = ls->log[ls->log_count];
-        int a = ls->action[ls->log_count];
 
-        if (a == ADD)
-            local_search_undo_add_vertex(g, ls, u);
-        else if (a == REMOVE)
-            local_search_undo_remove_vertex(g, ls, u);
+        if (!ls->independent_set[u])
+            local_search_add_vertex(g, ls, u, 0);
     }
 }
