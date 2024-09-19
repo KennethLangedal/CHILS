@@ -14,7 +14,7 @@ typedef struct
     int *prev_queue, *in_prev_queue;
 
     // Graph structures
-    int pool_size;
+    int pool_size, max_queue;
     long long *adjacent_weight;
     int *tabu, *tightness, *temp, *mask, *pool;
 
@@ -22,7 +22,7 @@ typedef struct
     int log_count;
     int *log;
 
-    unsigned int seed, remove_count;
+    unsigned int seed;
 } local_search;
 
 local_search *local_search_init(graph *g, unsigned int seed);

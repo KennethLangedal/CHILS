@@ -38,6 +38,7 @@ const char *help = "PILS --- Parallel Iterated Local Search\n"
                    "-t sec \t\tTimout in seconds \t\t\t\t default 3600 seconds\n"
                    "-s sec \t\tAlternating interval for PILS \t\t\t default 5 seconds\n"
                    "-r sec \t\tTime to spend on initial reductions \t\t default 0 seconds\n"
+                   "-q N \t\tMax queue size after shake \t\t\t default 512\n"
                    "\n* Mandatory input";
 
 int main(int argc, char **argv)
@@ -45,12 +46,12 @@ int main(int argc, char **argv)
     char *graph_path = NULL,
          *initial_solution_path = NULL,
          *solution_path = NULL;
-    int verbose = 0, run_pils = 1, run_reductions = 0;
+    int verbose = 0, run_pils = 1, run_reductions = 0, max_queue = 512;
     double timeout = 3600, step = 5, reduction_timout = 30;
 
     int command;
 
-    while ((command = getopt(argc, argv, "hvg:i:o:p:t:s:r:")) != -1)
+    while ((command = getopt(argc, argv, "hvg:i:o:p:t:s:r:q:")) != -1)
     {
         switch (command)
         {
@@ -81,6 +82,9 @@ int main(int argc, char **argv)
         case 'r':
             run_reductions = 1;
             reduction_timout = atof(optarg);
+            break;
+        case 'q':
+            max_queue = atoi(optarg);
             break;
         case '?':
             return 1;
@@ -162,7 +166,8 @@ int main(int argc, char **argv)
         if (solution_path != NULL)
             printf("Output: \t\t%s\n", solution_path);
         printf("Tiomeout: \t\t%.2lf seconds\n", timeout);
-        if (run_pils > 0)
+        printf("Max queue size: \t%d\n", max_queue);
+        if (run_pils > 1)
             printf("PILS interval: \t\t%.2lf seconds\n", step);
         if (initial_solution_path != NULL)
             printf("Initial solution: \t%lld\n", initial_solution_weight);
@@ -215,15 +220,12 @@ int main(int argc, char **argv)
             pils_set_solution(g, p, initial_solution);
 
         for (int i = 0; i < run_pils; i++)
-            p->LS[i]->remove_count = 4;
+            p->LS[i]->max_queue = max_queue;
+
         pils_run(g, p, t10, verbose, offset);
         w10 = mwis_validate(g, pils_get_best_independent_set(p)) + offset;
-        for (int i = 0; i < run_pils; i++)
-            p->LS[i]->remove_count = 8;
         pils_run(g, p, t50, verbose, offset);
         w50 = mwis_validate(g, pils_get_best_independent_set(p)) + offset;
-        for (int i = 0; i < run_pils; i++)
-            p->LS[i]->remove_count = 16;
         pils_run(g, p, t100, verbose, offset);
         w100 = mwis_validate(g, pils_get_best_independent_set(p)) + offset;
 
@@ -237,13 +239,11 @@ int main(int argc, char **argv)
     {
         local_search *ls = local_search_init(g, 0);
 
-        ls->remove_count = 4;
+        ls->max_queue = max_queue;
         local_search_explore(g, ls, t10, verbose, offset);
         w10 = mwis_validate(g, ls->independent_set) + offset;
-        ls->remove_count = 8;
         local_search_explore(g, ls, t50, verbose, offset);
         w50 = mwis_validate(g, ls->independent_set) + offset;
-        ls->remove_count = 16;
         local_search_explore(g, ls, t100, verbose, offset);
         w100 = mwis_validate(g, ls->independent_set) + offset;
 

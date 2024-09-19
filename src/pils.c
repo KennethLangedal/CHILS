@@ -122,7 +122,7 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
 #pragma omp for
             for (int i = 0; i < p->N; i++)
                 if (Nr > 0)
-                    local_search_explore(g, p->LS[i], p->step, 0, 0); // * ((double)Nr / (double)g->N)
+                    local_search_explore(g, p->LS[i], p->step * ((double)Nr / (double)g->N), 0, 0);
 
 #pragma omp for
             for (int i = 0; i < p->N; i++)

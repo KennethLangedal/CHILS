@@ -23,6 +23,7 @@ local_search *local_search_init(graph *g, unsigned int seed)
     ls->in_prev_queue = malloc(sizeof(int) * g->N);
 
     ls->pool_size = g->N;
+    ls->max_queue = 512;
     ls->adjacent_weight = malloc(sizeof(long long) * g->N);
     ls->tabu = malloc(sizeof(int) * g->N);
     ls->tightness = malloc(sizeof(int) * g->N);
@@ -34,7 +35,6 @@ local_search *local_search_init(graph *g, unsigned int seed)
     ls->log = malloc(sizeof(int) * MAX_LOG);
 
     ls->seed = seed;
-    ls->remove_count = 4;
 
     for (int u = 0; u < g->N; u++)
     {
@@ -429,8 +429,8 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose, lo
             local_search_add_vertex(g, ls, u, 1);
             local_search_lock_vertex(g, ls, u);
 
-            int to_remove = __builtin_clz(((unsigned int)rand_r(&ls->seed)) + 1);
-            for (int i = 0; i < to_remove && ls->queue_count > 0 && ls->cost <= best; i++)
+            // int to_remove = __builtin_clz(((unsigned int)rand_r(&ls->seed)) + 1);
+            for (int i = 0; i < 64 && ls->queue_count > 0 && ls->queue_count < ls->max_queue && ls->cost <= best; i++)
             {
                 int v = ls->queue[rand_r(&ls->seed) % ls->queue_count];
                 q = 0;
