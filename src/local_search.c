@@ -393,8 +393,8 @@ void local_search_greedy(graph *g, local_search *ls)
             else if (ls->independent_set[u] && g->V[u + 1] - g->V[u] < MAX_TWO_ONE_DEGREE)
                 local_search_two_one(g, ls, u);
 
-            if (ls->tightness[u] == 1)
-                local_search_aap(g, ls, u, 1);
+            // if (ls->tightness[u] == 1)
+            //     local_search_aap(g, ls, u, 1);
         }
 
         local_search_shuffle(ls->queue, ls->queue_count, &ls->seed);
@@ -469,7 +469,7 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose, lo
 
         if (ls->independent_set[u] || ls->tightness[u] == 1)
         {
-            local_search_aap(g, ls, u, 0);
+            local_search_aap(g, ls, u, ls->tightness[u] == 1);
             local_search_greedy(g, ls);
         }
         else
