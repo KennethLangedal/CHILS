@@ -148,7 +148,7 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
                         if (p->LS[i]->independent_set[reverse_map[u]])
                             ref += kernel->W[u];
 
-                    local_search_explore(kernel, ls_kernel, p->step * 0.1, 0, 0);
+                    local_search_explore(kernel, ls_kernel, p->step * 0.5, 0, 0);
 
                     if (i != best || ref <= ls_kernel->cost)
                         for (int u = 0; u < kernel->N; u++)
@@ -160,19 +160,8 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
 #pragma omp single
                 {
                     graph_free(kernel);
-                    // end = omp_get_wtime();
-                    // elapsed = end - start;
                 }
             }
-
-//             if (Nr <= MIN_CORE || p->LS[best]->cost == p->LS[worst]->cost)
-//             {
-// #pragma omp barrier
-// #pragma omp for
-//                 for (int i = 0; i < p->N; i++)
-//                     if (i != best)
-//                         local_search_scramble(g, p->LS[i], 128);
-//             }
 
 #pragma omp barrier
 #pragma omp single
@@ -184,37 +173,13 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
                 Nr = 0;
             }
         }
-
-        //             int best = 0, worst = 0;
-        //             for (int i = 1; i < p->N; i++)
-        //                 if (p->LS[i]->cost > p->LS[best]->cost)
-        //                     best = i;
-        //                 else if (p->LS[i]->cost < p->LS[worst]->cost)
-        //                     worst = i;
-
-        //             if (kernel->N < MIN_CORE || p->LS[best]->cost == p->LS[worst]->cost)
-        //             {
-
-        // #pragma omp barrier
-        // #pragma omp for
-        //                 for (int i = 0; i < p->N; i++)
-        //                 {
-        //                     if (i == best)
-        //                         continue;
-
-        //                     p->LS[i]->log_enabled = 0;
-        //                     for (int u = 0; u < g->N; u++)
-        //                         if (p->LS[i]->independent_set[u])
-        //                             local_search_remove_vertex(g, p->LS[i], u);
-        //                     p->LS[i]->log_enabled = 1;
-        //                 }
-        //             }
-
-        // #pragma omp barrier
     }
 
     if (verbose)
         printf("\n");
+
+    free(reverse_map);
+    free(A);
 }
 
 void pils_set_solution(graph *g, pils *p, const int *independent_set)
