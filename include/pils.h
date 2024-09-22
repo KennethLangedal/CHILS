@@ -7,7 +7,7 @@ typedef struct
     int N;
     double step;
 
-    int *C, *A, *S;
+    int *A;
     local_search **LS;
 } pils;
 

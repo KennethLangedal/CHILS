@@ -38,7 +38,7 @@ const char *help = "PILS --- Parallel Iterated Local Search\n"
                    "-t sec \t\tTimout in seconds \t\t\t\t default 3600 seconds\n"
                    "-s sec \t\tAlternating interval for PILS \t\t\t default 5 seconds\n"
                    "-r sec \t\tTime to spend on initial reductions \t\t default 0 seconds\n"
-                   "-q N \t\tMax queue size after shake \t\t\t default 512\n"
+                   "-q N \t\tMax queue size after shake \t\t\t default 32\n"
                    "\n* Mandatory input";
 
 int main(int argc, char **argv)
@@ -46,7 +46,7 @@ int main(int argc, char **argv)
     char *graph_path = NULL,
          *initial_solution_path = NULL,
          *solution_path = NULL;
-    int verbose = 0, run_pils = 1, run_reductions = 0, max_queue = 512;
+    int verbose = 0, run_pils = 1, run_reductions = 0, max_queue = 32;
     double timeout = 3600, step = 5, reduction_timout = 30;
 
     int command;
@@ -189,13 +189,15 @@ int main(int argc, char **argv)
             A[i] = 1;
 
         kernelize_csr(g->N, g->V, g->E, g->W, A,
-                      original_solution, &offset, reduction_timout, 6,
+                      original_solution, &offset, reduction_timout, 8,
                       reduction_neighborhood_csr,
                       reduction_clique_csr,
                       reduction_domination_csr,
                       reduction_single_edge_csr,
-                      reduction_twin_csr,
-                      reduction_unconfined_csr);
+                      reduction_extended_single_edge_csr,
+                      reduction_extended_twin_csr,
+                      reduction_unconfined_csr,
+                      reduction_extended_unconfined_csr);
 
         original_graph = g;
         g = graph_subgraph(original_graph, A, reverse_mapping);
@@ -220,7 +222,7 @@ int main(int argc, char **argv)
             pils_set_solution(g, p, initial_solution);
 
         for (int i = 0; i < run_pils; i++)
-            p->LS[i]->max_queue = max_queue;
+            p->LS[i]->max_queue = max_queue + (i * 8);
 
         pils_run(g, p, t10, verbose, offset);
         w10 = mwis_validate(g, pils_get_best_independent_set(p)) + offset;
@@ -238,6 +240,11 @@ int main(int argc, char **argv)
     else
     {
         local_search *ls = local_search_init(g, 0);
+
+        if (initial_solution != NULL)
+            for (int u = 0; u < g->N; u++)
+                if (initial_solution[u])
+                    local_search_add_vertex(g, ls, u);
 
         ls->max_queue = max_queue;
         local_search_explore(g, ls, t10, verbose, offset);

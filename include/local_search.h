@@ -19,7 +19,7 @@ typedef struct
     int *tabu, *tightness, *temp, *mask, *pool;
 
     // Action log
-    int log_count;
+    int log_count, log_enabled;
     int *log;
 
     unsigned int seed;
@@ -31,17 +31,19 @@ void local_search_free(local_search *ls);
 
 void local_search_in_order_solution(graph *g, local_search *ls);
 
-void local_search_add_vertex(graph *g, local_search *ls, int u, int l);
+void local_search_add_vertex(graph *g, local_search *ls, int u);
 
-void local_search_remove_vertex(graph *g, local_search *ls, int u, int l);
+void local_search_remove_vertex(graph *g, local_search *ls, int u);
 
 void local_search_lock_vertex(graph *g, local_search *ls, int u);
 
 void local_search_unlock_vertex(graph *g, local_search *ls, int u);
 
-void local_search_aap(graph *g, local_search *ls, int u);
+void local_search_aap(graph *g, local_search *ls, int u, int imp);
 
 void local_search_greedy(graph *g, local_search *ls);
+
+void local_search_scramble(graph *g, local_search *ls, int amount);
 
 void local_search_explore(graph *g, local_search *ls, double tl, int verbose, long long offset);
 
