@@ -220,11 +220,11 @@ int main(int argc, char **argv)
 
     if (run_pils > 1)
     {
+        if (num_threads > 0)
+            omp_set_num_threads(num_threads);
+
         pils *p = pils_init(g, run_pils);
         p->step = step;
-
-        if (num_threads > 0)
-            p->num_threads = num_threads;
 
         if (initial_solution != NULL)
             pils_set_solution(g, p, initial_solution);
