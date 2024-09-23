@@ -4,7 +4,7 @@
 
 typedef struct
 {
-    int N;
+    int N, num_threads;
     double step;
 
     int *A;

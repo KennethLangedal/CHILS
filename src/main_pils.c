@@ -224,7 +224,7 @@ int main(int argc, char **argv)
         p->step = step;
 
         if (num_threads > 0)
-            omp_set_num_threads(num_threads);
+            p->num_threads = num_threads;
 
         if (initial_solution != NULL)
             pils_set_solution(g, p, initial_solution);

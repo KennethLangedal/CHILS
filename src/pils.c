@@ -23,6 +23,7 @@ pils *pils_init(graph *g, int N)
 
 #pragma omp parallel
     {
+        p->num_threads = omp_get_num_threads();
 #pragma omp for
         for (int i = 0; i < N; i++)
             p->LS[i] = local_search_init(g, i);
@@ -74,7 +75,7 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
     int *A = malloc(sizeof(int) * g->N);
     int Nr;
 
-#pragma omp parallel shared(elapsed, kernel, reverse_map, A, Nr)
+#pragma omp parallel num_threads(p->num_threads) shared(elapsed, kernel, reverse_map, A, Nr)
     {
 #pragma omp for
         for (int i = 0; i < p->N; i++)
