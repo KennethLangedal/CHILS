@@ -127,7 +127,7 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
 
             int best = 0, worst = 0;
             for (int i = 1; i < p->N; i++)
-                if (p->LS[i]->cost > p->LS[best]->cost)
+                if (p->LS[i]->cost >= p->LS[best]->cost)
                     best = i;
                 else if (p->LS[i]->cost < p->LS[worst]->cost)
                     worst = i;
