@@ -5,7 +5,7 @@
 #include "pils.h"
 #include "reductions.h"
 
-#define MIN_CORE 128
+#define MIN_CORE 512
 
 pils *pils_init(graph *g, int N)
 {
@@ -115,12 +115,14 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
                 Nr += A[i];
             }
 
-#pragma omp single
+            if (verbose)
             {
-                end = omp_get_wtime();
-                elapsed = end - start;
-                if (verbose)
+#pragma omp single
+                {
+                    end = omp_get_wtime();
+                    elapsed = end - start;
                     pils_print(p, offset, elapsed, g->N);
+                }
             }
 
             int best = 0, worst = 0;
@@ -130,37 +132,41 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
                 else if (p->LS[i]->cost < p->LS[worst]->cost)
                     worst = i;
 
-            if (Nr > MIN_CORE)
-            {
-
-#pragma omp barrier
 #pragma omp single
-                {
-                    kernel = graph_subgraph(g, A, reverse_map);
-                }
+            {
+                kernel = graph_subgraph(g, A, reverse_map);
+            }
 
 #pragma omp for
-                for (int i = 0; i < p->N; i++)
-                {
-                    local_search *ls_kernel = local_search_init(kernel, i);
-                    long long ref = 0;
+            for (int i = 0; i < p->N; i++)
+            {
+                local_search *ls_kernel = local_search_init(kernel, i);
+                long long ref = 0;
+                for (int u = 0; u < kernel->N; u++)
+                    if (p->LS[i]->independent_set[reverse_map[u]])
+                        ref += kernel->W[u];
+
+                local_search_explore(kernel, ls_kernel, p->step * 0.5, 0, 0);
+
+                if (i != best || ref <= ls_kernel->cost)
                     for (int u = 0; u < kernel->N; u++)
-                        if (p->LS[i]->independent_set[reverse_map[u]])
-                            ref += kernel->W[u];
+                        if (ls_kernel->independent_set[u] && !p->LS[i]->independent_set[reverse_map[u]])
+                            local_search_add_vertex(g, p->LS[i], reverse_map[u]);
 
-                    local_search_explore(kernel, ls_kernel, p->step * 0.5, 0, 0);
+                local_search_free(ls_kernel);
+            }
 
-                    if (i != best || ref <= ls_kernel->cost)
-                        for (int u = 0; u < kernel->N; u++)
-                            if (ls_kernel->independent_set[u] && !p->LS[i]->independent_set[reverse_map[u]])
-                                local_search_add_vertex(g, p->LS[i], reverse_map[u]);
-
-                    local_search_free(ls_kernel);
-                }
 #pragma omp single
-                {
-                    graph_free(kernel);
-                }
+            {
+                graph_free(kernel);
+            }
+
+            if (Nr < MIN_CORE)
+            {
+#pragma omp for
+                for (int i = 0; i < p->N; i++)
+                    if (i != best)
+                        local_search_scramble(g, p->LS[i], 32);
             }
 
 #pragma omp barrier
