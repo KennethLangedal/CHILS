@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <omp.h>
 
 #include "graph.h"
 #include "reductions.h"
@@ -39,6 +40,7 @@ const char *help = "PILS --- Parallel Iterated Local Search\n"
                    "-s sec \t\tAlternating interval for PILS \t\t\t default 5 seconds\n"
                    "-r sec \t\tTime to spend on initial reductions \t\t default 0 seconds\n"
                    "-q N \t\tMax queue size after shake \t\t\t default 32\n"
+                   "-c T \t\tSet a specific number of threads  \t\t default OMP_NUM_THREADS\n"
                    "\n* Mandatory input";
 
 int main(int argc, char **argv)
@@ -46,12 +48,12 @@ int main(int argc, char **argv)
     char *graph_path = NULL,
          *initial_solution_path = NULL,
          *solution_path = NULL;
-    int verbose = 0, run_pils = 1, run_reductions = 0, max_queue = 32;
+    int verbose = 0, run_pils = 1, run_reductions = 0, max_queue = 32, num_threads = -1;
     double timeout = 3600, step = 5, reduction_timout = 30;
 
     int command;
 
-    while ((command = getopt(argc, argv, "hvg:i:o:p:t:s:r:q:")) != -1)
+    while ((command = getopt(argc, argv, "hvg:i:o:p:t:s:r:q:c:")) != -1)
     {
         switch (command)
         {
@@ -85,6 +87,9 @@ int main(int argc, char **argv)
             break;
         case 'q':
             max_queue = atoi(optarg);
+            break;
+        case 'c':
+            num_threads = atoi(optarg);
             break;
         case '?':
             return 1;
@@ -217,6 +222,9 @@ int main(int argc, char **argv)
     {
         pils *p = pils_init(g, run_pils);
         p->step = step;
+
+        if (num_threads > 0)
+            omp_set_num_threads(num_threads);
 
         if (initial_solution != NULL)
             pils_set_solution(g, p, initial_solution);
