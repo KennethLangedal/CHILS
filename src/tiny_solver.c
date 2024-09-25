@@ -109,13 +109,13 @@ static inline void tiny_solver_reduce(tiny_solver *solver, int layer)
                 continue;
             for (int v = 0; v < N; v++)
             {
-                if (S[v] != 0 || v == u || W[u] > W[v])
+                if (S[v] != 0 || v == u || W[u] > W[v] || !g[u][v])
                     continue;
 
                 int dom = 1;
                 for (int i = 0; i < N; i++)
                 {
-                    if (i == u || i == v)
+                    if (S[i] != 0 || i == u || i == v)
                         continue;
                     if (g[v][i] && !g[u][i])
                     {

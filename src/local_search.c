@@ -199,7 +199,8 @@ void local_search_two_one(graph *g, local_search *ls, int u)
     if (adjacent_count < 2)
         return;
 
-    // int b1 = -1, b2 = -1;
+    int b1 = -1, b2 = -1;
+    long long best = LLONG_MIN;
     for (int i = 0; i < adjacent_count; i++)
     {
         int v = ls->temp[i];
@@ -216,24 +217,28 @@ void local_search_two_one(graph *g, local_search *ls, int u)
                 i1++;
             else if (g->W[w1] + g->W[v] > g->W[u])
             {
-                //  &&
-                // (b1 < 0 || g->W[w1] + g->W[v] > g->W[b1] + g->W[b2])
-                //     b1 = v;
-                //     b2 = w1;
-                //     i2++;
-                local_search_add_vertex(g, ls, v);
-                local_search_add_vertex(g, ls, w1);
-                return;
+                long long gain = (rand_r(&ls->seed) % (1 << 30)) - (1 << 29);
+                long long diff = (g->W[w1] + g->W[v]) - g->W[u];
+                if (diff + gain > best)
+                {
+                    best = diff + gain;
+                    b1 = v;
+                    b2 = w1;
+                }
+                i1++;
+                // local_search_add_vertex(g, ls, v);
+                // local_search_add_vertex(g, ls, w1);
+                // return;
             }
             else
-                i2++;
+                i1++;
         }
     }
-    // if (b1 >= 0)
-    // {
-    //     local_search_add_vertex(g, ls, b1);
-    //     local_search_add_vertex(g, ls, b2);
-    // }
+    if (b1 >= 0)
+    {
+        local_search_add_vertex(g, ls, b1);
+        local_search_add_vertex(g, ls, b2);
+    }
 }
 
 void local_search_aap(graph *g, local_search *ls, int u, int imp)

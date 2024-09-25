@@ -165,7 +165,7 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
             {
 #pragma omp for
                 for (int i = 0; i < p->N; i++)
-                    if (i != best)
+                    if (i != best && p->LS[i]->cost == p->LS[best]->cost)
                         local_search_scramble(g, p->LS[i], 32);
             }
 
