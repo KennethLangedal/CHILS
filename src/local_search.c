@@ -215,8 +215,12 @@ void local_search_two_one(graph *g, local_search *ls, int u)
                 i1++, i2++;
             else if (w1 == v)
                 i1++;
-            else if (g->W[w1] + g->W[v] > g->W[u])
+            else // (w1 < w2) Found 2-1 swap
             {
+                i1++;
+                if (g->W[w1] + g->W[v] <= g->W[u])
+                    continue;
+
                 long long gain = (rand_r(&ls->seed) % (1 << 30)) - (1 << 29);
                 long long diff = (g->W[w1] + g->W[v]) - g->W[u];
                 if (diff + gain > best)
@@ -225,13 +229,10 @@ void local_search_two_one(graph *g, local_search *ls, int u)
                     b1 = v;
                     b2 = w1;
                 }
-                i1++;
                 // local_search_add_vertex(g, ls, v);
                 // local_search_add_vertex(g, ls, w1);
                 // return;
             }
-            else
-                i1++;
         }
     }
     if (b1 >= 0)
