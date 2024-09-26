@@ -45,7 +45,7 @@ void pils_print(pils *p, long long offset, double elapsed, int Nr)
 {
     int best = 0, worst = 0;
     for (int i = 1; i < p->N; i++)
-        if (p->LS[i]->cost > p->LS[best]->cost)
+        if (p->LS[i]->cost >= p->LS[best]->cost)
             best = i;
         else if (p->LS[i]->cost < p->LS[worst]->cost)
             worst = i;
@@ -140,6 +140,8 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
 #pragma omp for
             for (int i = 0; i < p->N; i++)
             {
+                if (kernel->N == 0)
+                    continue;
                 local_search *ls_kernel = local_search_init(kernel, i);
                 long long ref = 0;
                 for (int u = 0; u < kernel->N; u++)
