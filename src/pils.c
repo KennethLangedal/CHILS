@@ -5,7 +5,7 @@
 #include "pils.h"
 #include "reductions.h"
 
-#define MIN_CORE 512
+#define MIN_CORE 32
 
 pils *pils_init(graph *g, int N)
 {
@@ -163,15 +163,11 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
                 graph_free(kernel);
             }
 
-            if (Nr < MIN_CORE)
-            {
-#pragma omp for
-                for (int i = 0; i < p->N; i++)
-                    if (i != best && p->LS[i]->cost == p->LS[best]->cost)
-                        local_search_scramble(g, p->LS[i], 32);
-            }
+// #pragma omp for
+//             for (int i = 0; i < p->N; i++)
+//                 if (i != best && p->LS[i]->cost == p->LS[best]->cost)
+//                     local_search_scramble(g, p->LS[i], 1);
 
-#pragma omp barrier
 #pragma omp single
             {
                 end = omp_get_wtime();

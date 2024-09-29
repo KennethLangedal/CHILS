@@ -5,8 +5,7 @@
 #include <limits.h>
 #include <assert.h>
 
-#define MAX_DEGREE 128
-#define SOLVE_RATE 2
+#define MAX_DEGREE 512
 #define MAX_SOLVE 128
 
 int reduction_unconfined_csr(reduction_data *R, int N, const int *V, const int *E,
@@ -18,14 +17,14 @@ int reduction_unconfined_csr(reduction_data *R, int N, const int *V, const int *
 
     int n = 0, m = 0;
 
-    assert(rp->Nb >= 4);
+    assert(rp->Nb >= 3);
 
     int *S = rp->T[0], *NS = rp->T[1];
-    int *S_B = rp->TB[0], *NS_B = rp->TB[1], *NSI_B = rp->TB[2];
+    int *S_B = rp->TB[0], *NS_B = rp->TB[1], *NIS_B = rp->TB[2];
 
     S[n++] = u;
     S_B[u] = 1;
-    NSI_B[u] = 1;
+    NIS_B[u] = 1;
     for (int i = V[u]; i < V[u + 1] && m <= MAX_DEGREE; i++)
     {
         int v = E[i];
@@ -33,7 +32,7 @@ int reduction_unconfined_csr(reduction_data *R, int N, const int *V, const int *
             continue;
         NS[m++] = v;
         NS_B[v] = 1;
-        NSI_B[v] = 1;
+        NIS_B[v] = 1;
     }
 
     int res = 0, first = 1;
@@ -44,41 +43,42 @@ int reduction_unconfined_csr(reduction_data *R, int N, const int *V, const int *
         if (S_B[v])
             continue;
 
-        long long sw = 0;
-        if (first)
-            sw = W[u];
-        else
-            for (int i = V[v]; i < V[v + 1] && sw <= W[v]; i++)
-                if (A[E[i]] && S_B[E[i]])
-                    sw += W[E[i]];
+        long long sw = 0, dw = 0;
+        int dn = 0, x = -1;
 
-        if (sw > W[v])
+        if (first && W[v] < W[u]) // Not a child
             continue;
 
-        int xn = 0, x = -1;
-        long long ds = 0;
-        for (int i = V[v]; i < V[v + 1] && (sw + ds <= W[v] || xn <= 1); i++)
+        for (int i = V[v]; i < V[v + 1]; i++)
         {
             int w = E[i];
-            if (A[w] && !NSI_B[w])
+            if (!A[w])
+                continue;
+
+            if (S_B[w])
+                sw += W[w];
+            else if (!NIS_B[w])
             {
-                xn++;
+                dw += W[w];
+                dn++;
                 x = w;
-                ds += W[w];
             }
         }
 
-        if (sw + ds <= W[v]) // Can reduce u
+        if (W[v] < sw) // Not a chld
+            continue;
+
+        if (sw + dw <= W[v]) // Condition 1. can reduce u
         {
             res = 1;
             break;
         }
-        else if (sw + ds > W[v] && xn == 1) // Extend S
+        else if (sw + dw > W[v] && dn == 1) // Extending child
         {
             first = 0;
             S[n++] = x;
             S_B[x] = 1;
-            NSI_B[x] = 1;
+            NIS_B[x] = 1;
             for (int i = V[x]; i < V[x + 1]; i++)
             {
                 int w = E[i];
@@ -86,24 +86,21 @@ int reduction_unconfined_csr(reduction_data *R, int N, const int *V, const int *
                     continue;
                 NS[m++] = w;
                 NS_B[w] = 1;
-                NSI_B[w] = 1;
+                NIS_B[w] = 1;
             }
         }
     }
 
     while (m > 0)
-    {
-        int v = NS[--m];
-        NS_B[v] = 0;
-    }
+        NS_B[NS[--m]] = 0;
 
     for (int i = 0; i < n; i++)
     {
         int v = S[i];
         for (int j = V[v]; j < V[v + 1]; j++)
-            NSI_B[E[j]] = 0;
+            NIS_B[E[j]] = 0;
         S_B[v] = 0;
-        NSI_B[v] = 0;
+        NIS_B[v] = 0;
     }
 
     if (res)
@@ -124,12 +121,12 @@ int reduction_extended_unconfined_csr(reduction_data *R, int N, const int *V, co
 
     assert(R->Nb >= 4);
 
-    int *S = R->T[0], *NS = R->T[1], *T = R->T[2];
-    int *S_B = R->TB[0], *NS_B = R->TB[1], *NSI_B = R->TB[2];
+    int *S = R->T[0], *NS = R->T[1], *T = R->T[2], *I = R->T[3];
+    int *S_B = R->TB[0], *NS_B = R->TB[1], *NIS_B = R->TB[2];
 
     S[n++] = u;
     S_B[u] = 1;
-    NSI_B[u] = 1;
+    NIS_B[u] = 1;
     for (int i = V[u]; i < V[u + 1] && m <= MAX_DEGREE; i++)
     {
         int v = E[i];
@@ -137,7 +134,7 @@ int reduction_extended_unconfined_csr(reduction_data *R, int N, const int *V, co
             continue;
         NS[m++] = v;
         NS_B[v] = 1;
-        NSI_B[v] = 1;
+        NIS_B[v] = 1;
     }
 
     int res = 0, first = 1;
@@ -148,63 +145,82 @@ int reduction_extended_unconfined_csr(reduction_data *R, int N, const int *V, co
         if (S_B[v])
             continue;
 
-        long long sw = 0;
-        if (first)
-            sw = W[u];
-        else
-            for (int i = V[v]; i < V[v + 1] && sw <= W[v]; i++)
-                if (A[E[i]] && S_B[E[i]])
-                    sw += W[E[i]];
+        long long sw = 0, dw = 0, dsw = 0;
+        int dn = 0, in = 0;
 
-        if (sw > W[v])
+        if (first && W[v] < W[u]) // Not a child
             continue;
 
-        int xn = 0, x = -1;
-        long long ds = 0;
-        for (int i = V[v]; i < V[v + 1] && xn <= MAX_SOLVE &&
-                           (xn <= 1 || sw + ds < W[v] * SOLVE_RATE);
-             i++)
+        for (int i = V[v]; i < V[v + 1]; i++)
         {
             int w = E[i];
-            if (A[w] && !NSI_B[w])
+            if (!A[w])
+                continue;
+
+            if (S_B[w])
+                sw += W[w];
+            else if (!NIS_B[w])
             {
-                T[xn] = w;
-                xn++;
-                x = w;
-                ds += W[w];
+                dw += W[w];
+                T[dn++] = w;
             }
         }
 
-        if (xn <= MAX_SOLVE && sw + ds < W[v] * SOLVE_RATE)
-        {
-            tiny_solver_solve_subgraph(R->solver, 1.0, W[v] - sw, xn, T, V, E, W, A);
-            if (!R->solver->time_limit_exceeded)
-            {
-                ds = R->solver->independent_set_weight;
-            }
-        }
+        if (W[v] < sw || dn > MAX_SOLVE) // Not a chld
+            continue;
 
-        if (sw + ds <= W[v]) // Can reduce u
+        if (W[v] >= sw + dw) // Can reduce u
         {
             res = 1;
             break;
         }
-        else if (sw + ds > W[v] && xn == 1) // Extend S
-        {
-            first = 0;
 
-            S[n++] = x;
-            S_B[x] = 1;
-            NSI_B[x] = 1;
-            for (int i = V[x]; i < V[x + 1]; i++)
+        tiny_solver_solve_subgraph(R->solver, 1.0, LLONG_MAX, dn, T, V, E, W, A);
+        if (R->solver->time_limit_exceeded)
+            continue;
+
+        dw = R->solver->independent_set_weight;
+        dsw = 0;
+
+        if (W[v] >= sw + dw) // Can reduce u
+        {
+            res = 1;
+            break;
+        }
+
+        // Copy condidates
+        for (int i = 0; i < dn; i++)
+            I[i] = R->solver->independent_set[i] == 1 ? 1 : 0;
+
+        // Find vertices to extend S, solve without each vertex included
+        for (int i = 0; i < dn; i++)
+        {
+            if (!I[i])
+                continue;
+
+            int w = T[i];
+            T[i] = T[dn - 1];
+            tiny_solver_solve_subgraph(R->solver, 1.0, LLONG_MAX, dn - 1, T, V, E, W, A);
+
+            if (!R->solver->time_limit_exceeded && W[v] >= sw + R->solver->independent_set_weight)
             {
-                int w = E[i];
-                if (!A[w] || NS_B[w])
-                    continue;
-                NS[m++] = w;
-                NS_B[w] = 1;
-                NSI_B[w] = 1;
+                first = 0;
+
+                S[n++] = w;
+                S_B[w] = 1;
+                NIS_B[w] = 1;
+                for (int j = V[w]; j < V[w + 1]; j++)
+                {
+                    int x = E[j];
+                    if (!A[x] || NS_B[x])
+                        continue;
+                    NS[m++] = x;
+                    NS_B[x] = 1;
+                    NIS_B[x] = 1;
+                }
             }
+
+            T[i] = w;
         }
     }
 
@@ -218,9 +234,9 @@ int reduction_extended_unconfined_csr(reduction_data *R, int N, const int *V, co
     {
         int v = S[i];
         for (int j = V[v]; j < V[v + 1]; j++)
-            NSI_B[E[j]] = 0;
+            NIS_B[E[j]] = 0;
         S_B[v] = 0;
-        NSI_B[v] = 0;
+        NIS_B[v] = 0;
     }
 
     if (res)
@@ -229,5 +245,6 @@ int reduction_extended_unconfined_csr(reduction_data *R, int N, const int *V, co
         reducable[0] = u;
         return -1;
     }
+
     return 0;
 }

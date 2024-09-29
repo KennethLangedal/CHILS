@@ -27,7 +27,7 @@ int reduction_extended_single_edge_csr(reduction_data *R, int N, const int *V, c
     for (int i = V[u]; i < V[u + 1]; i++)
     {
         int v = E[i];
-        if (!A[v])
+        if (!A[v] || !neighborhood_set[v])
             continue;
 
         if (W[u] < neighborhood_weight - W[v])

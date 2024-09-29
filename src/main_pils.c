@@ -194,14 +194,13 @@ int main(int argc, char **argv)
             A[i] = 1;
 
         kernelize_csr(g->N, g->V, g->E, g->W, A,
-                      original_solution, &offset, reduction_timout, 8,
+                      original_solution, &offset, reduction_timout, 7,
                       reduction_neighborhood_csr,
                       reduction_clique_csr,
                       reduction_domination_csr,
                       reduction_single_edge_csr,
                       reduction_extended_single_edge_csr,
                       reduction_extended_twin_csr,
-                      reduction_unconfined_csr,
                       reduction_extended_unconfined_csr);
 
         original_graph = g;

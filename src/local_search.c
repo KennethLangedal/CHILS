@@ -7,6 +7,7 @@
 
 #define MAX_GUESS 512
 #define MAX_TWO_ONE_DEGREE 1024
+#define AAP_LIMIT 10000000
 
 local_search *local_search_init(graph *g, unsigned int seed)
 {
@@ -223,15 +224,13 @@ void local_search_two_one(graph *g, local_search *ls, int u)
 
                 long long gain = (rand_r(&ls->seed) % (1 << 30)) - (1 << 29);
                 long long diff = (g->W[w1] + g->W[v]) - g->W[u];
+
                 if (diff + gain > best)
                 {
                     best = diff + gain;
                     b1 = v;
                     b2 = w1;
                 }
-                // local_search_add_vertex(g, ls, v);
-                // local_search_add_vertex(g, ls, w1);
-                // return;
             }
         }
     }
@@ -399,7 +398,7 @@ void local_search_greedy(graph *g, local_search *ls)
             else if (ls->independent_set[u] && g->V[u + 1] - g->V[u] < MAX_TWO_ONE_DEGREE)
                 local_search_two_one(g, ls, u);
 
-            if (ls->tightness[u] == 1 && g->V[g->N] < 10000000)
+            if (ls->tightness[u] == 1 && g->V[g->N] < AAP_LIMIT)
                 local_search_aap(g, ls, u, 1);
         }
 
