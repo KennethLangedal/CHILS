@@ -8,6 +8,8 @@
 #define MAX_GUESS 512
 #define MAX_TWO_ONE_DEGREE 1024
 #define AAP_LIMIT 10000000
+#define LOG_LIMIT 8
+#define DEFAULT_QUEUE_SIZE 32
 
 local_search *local_search_init(graph *g, unsigned int seed)
 {
@@ -23,7 +25,7 @@ local_search *local_search_init(graph *g, unsigned int seed)
     ls->in_prev_queue = malloc(sizeof(int) * g->N);
 
     ls->pool_size = g->N;
-    ls->max_queue = 32;
+    ls->max_queue = DEFAULT_QUEUE_SIZE;
     ls->adjacent_weight = malloc(sizeof(long long) * g->N);
     ls->tabu = malloc(sizeof(int) * g->N);
     ls->tightness = malloc(sizeof(int) * g->N);
@@ -33,7 +35,7 @@ local_search *local_search_init(graph *g, unsigned int seed)
 
     ls->log_count = 0;
     ls->log_enabled = 0;
-    ls->log = malloc(sizeof(int) * g->N * 4);
+    ls->log = malloc(sizeof(int) * g->N * LOG_LIMIT);
 
     ls->seed = seed;
 
@@ -128,6 +130,12 @@ void local_search_remove_vertex(graph *g, local_search *ls, int u)
 
     if (ls->log_enabled)
         ls->log[ls->log_count++] = u;
+
+    if (ls->log_count >= g->N * 8)
+    {
+        fprintf(stderr, "Log count exceeded, this should never happen\n");
+        exit(1);
+    }
 
     ls->independent_set[u] = 0;
     ls->cost -= g->W[u];
