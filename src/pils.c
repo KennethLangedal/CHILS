@@ -150,7 +150,7 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
 
                 local_search_explore(kernel, ls_kernel, p->step * 0.5, 0, 0);
 
-                if (i != best || ref <= ls_kernel->cost)
+                if (ref <= ls_kernel->cost)
                     for (int u = 0; u < kernel->N; u++)
                         if (ls_kernel->independent_set[u] && !p->LS[i]->independent_set[reverse_map[u]])
                             local_search_add_vertex(g, p->LS[i], reverse_map[u]);
