@@ -5,7 +5,8 @@
 #include "pils.h"
 #include "reductions.h"
 
-#define MIN_CORE 32
+#define MIN_CORE (1 << 5)
+#define MAX_CORE (1 << 12)
 
 pils *pils_init(graph *g, int N)
 {
@@ -147,6 +148,11 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
                 for (int u = 0; u < kernel->N; u++)
                     if (p->LS[i]->independent_set[reverse_map[u]])
                         ref += kernel->W[u];
+
+                if (kernel->N > MAX_CORE)
+                    for (int u = 0; u < kernel->N; u++)
+                        if (p->LS[i]->independent_set[reverse_map[u]])
+                            local_search_add_vertex(kernel, ls_kernel, u);
 
                 local_search_explore(kernel, ls_kernel, p->step * 0.5, 0, 0);
 
