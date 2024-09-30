@@ -229,7 +229,7 @@ int main(int argc, char **argv)
             pils_set_solution(g, p, initial_solution);
 
         for (int i = 0; i < run_pils; i++)
-            p->LS[i]->max_queue = max_queue + i;
+            p->LS[i]->max_queue = max_queue + (8 * i);
 
         pils_run(g, p, t10, verbose, offset);
         w10 = mwis_validate(g, pils_get_best_independent_set(p)) + offset;
