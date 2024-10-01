@@ -273,7 +273,7 @@ void local_search_aap(graph *g, local_search *ls, int u, int imp)
             }
         }
 
-        if (ls->tabu[current])
+        if (current < 0 || ls->tabu[current])
             return;
         ls->mask[u] = 1;
     }
