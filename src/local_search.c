@@ -417,24 +417,49 @@ void local_search_greedy(graph *g, local_search *ls)
     }
 }
 
-void local_search_scramble(graph *g, local_search *ls, int amount)
+void local_search_perturbate(graph *g, local_search *ls)
 {
-    ls->log_enabled = 0;
+    int u = ls->pool[rand_r(&ls->seed) % ls->pool_size];
+    int q = 0;
+    while (q++ < MAX_GUESS && ls->tabu[u])
+        u = ls->pool[rand_r(&ls->seed) % ls->pool_size];
 
-    for (int i = 0; i < amount; i++)
+    if (ls->tabu[u])
+        return;
+
+    long long best = ls->cost;
+
+    if (ls->independent_set[u] || ls->tightness[u] == 1)
     {
-        int u = ls->pool[rand_r(&ls->seed) % ls->pool_size];
-        int q = 0;
-        while (q++ < MAX_GUESS && (ls->tabu[u] || ls->independent_set[u]))
-            u = ls->pool[rand_r(&ls->seed) % ls->pool_size];
-
-        if (ls->tabu[u] || ls->independent_set[u])
-            continue;
-
-        local_search_add_vertex(g, ls, u);
+        local_search_aap(g, ls, u, ls->tightness[u] == 1);
     }
+    else
+    {
+        local_search_add_vertex(g, ls, u);
+        local_search_lock_vertex(g, ls, u);
 
-    ls->log_enabled = 1;
+        for (int i = 0; i < 32 &&
+                        ls->queue_count > 0 &&
+                        ls->queue_count < ls->max_queue &&
+                        ls->cost <= best;
+             i++)
+        {
+            int v = ls->queue[rand_r(&ls->seed) % ls->queue_count];
+            int q = 0;
+            while (q++ < MAX_GUESS && ls->tabu[v])
+                v = ls->queue[rand_r(&ls->seed) % ls->queue_count];
+
+            if (ls->tabu[v])
+                continue;
+
+            if (ls->independent_set[v])
+                local_search_remove_vertex(g, ls, v);
+            else
+                local_search_add_vertex(g, ls, v);
+        }
+
+        local_search_unlock_vertex(g, ls, u);
+    }
 }
 
 void local_search_explore(graph *g, local_search *ls, double tl, int verbose, long long offset)
@@ -472,48 +497,9 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose, lo
         ls->log_count = 0;
         ls->log_enabled = 1;
 
-        int u = ls->pool[rand_r(&ls->seed) % ls->pool_size];
-        q = 0;
-        while (q++ < MAX_GUESS && ls->tabu[u])
-            u = ls->pool[rand_r(&ls->seed) % ls->pool_size];
+        local_search_perturbate(g, ls);
 
-        if (ls->tabu[u])
-            continue;
-
-        if (ls->independent_set[u] || ls->tightness[u] == 1)
-        {
-            local_search_aap(g, ls, u, ls->tightness[u] == 1);
-            local_search_greedy(g, ls);
-        }
-        else
-        {
-            local_search_add_vertex(g, ls, u);
-            local_search_lock_vertex(g, ls, u);
-
-            for (int i = 0; i < 32 &&
-                            ls->queue_count > 0 &&
-                            ls->queue_count < ls->max_queue &&
-                            ls->cost <= best;
-                 i++)
-            {
-                int v = ls->queue[rand_r(&ls->seed) % ls->queue_count];
-                q = 0;
-                while (q++ < MAX_GUESS && ls->tabu[v])
-                    v = ls->queue[rand_r(&ls->seed) % ls->queue_count];
-
-                if (ls->tabu[v])
-                    continue;
-
-                if (ls->independent_set[v])
-                    local_search_remove_vertex(g, ls, v);
-                else
-                    local_search_add_vertex(g, ls, v);
-            }
-
-            local_search_greedy(g, ls);
-            local_search_unlock_vertex(g, ls, u);
-            local_search_greedy(g, ls);
-        }
+        local_search_greedy(g, ls);
 
         if (ls->cost > best)
         {

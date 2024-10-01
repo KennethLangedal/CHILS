@@ -5,8 +5,7 @@
 #include "pils.h"
 #include "reductions.h"
 
-#define MIN_CORE (1 << 5)
-#define MAX_CORE (1 << 12)
+#define MIN_CORE 32
 
 pils *pils_init(graph *g, int N)
 {
@@ -90,22 +89,21 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
         {
             end = omp_get_wtime();
             elapsed = end - start;
-        }
 
-        if (verbose)
-        {
-#pragma omp single
-            {
+            if (verbose)
                 pils_print(p, offset, elapsed, g->N);
-            }
         }
 
         while (elapsed < tl)
         {
+            /* Full graph LS */
 #pragma omp for
             for (int i = 0; i < p->N; i++)
+            {
                 local_search_explore(g, p->LS[i], p->step, 0, 0);
+            }
 
+            /* Mark the CHILS core */
 #pragma omp for reduction(+ : Nr)
             for (int i = 0; i < g->N; i++)
             {
@@ -116,47 +114,37 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
                 Nr += A[i];
             }
 
-            if (verbose)
-            {
-#pragma omp single
-                {
-                    end = omp_get_wtime();
-                    elapsed = end - start;
-                    pils_print(p, offset, elapsed, g->N);
-                }
-            }
-
-            int best = 0, worst = 0;
+            /* Find the best solution */
+            int best = 0;
             for (int i = 1; i < p->N; i++)
+            {
                 if (p->LS[i]->cost >= p->LS[best]->cost)
                     best = i;
-                else if (p->LS[i]->cost < p->LS[worst]->cost)
-                    worst = i;
+            }
 
+            /* Construct the CHILS core */
 #pragma omp single
             {
                 kernel = graph_subgraph(g, A, reverse_map);
             }
 
+            /* CHILS core LS */
 #pragma omp for
             for (int i = 0; i < p->N; i++)
             {
                 if (kernel->N == 0)
                     continue;
+
                 local_search *ls_kernel = local_search_init(kernel, i);
+
                 long long ref = 0;
                 for (int u = 0; u < kernel->N; u++)
                     if (p->LS[i]->independent_set[reverse_map[u]])
                         ref += kernel->W[u];
 
-                if (kernel->N > MAX_CORE)
-                    for (int u = 0; u < kernel->N; u++)
-                        if (p->LS[i]->independent_set[reverse_map[u]])
-                            local_search_add_vertex(kernel, ls_kernel, u);
-
                 local_search_explore(kernel, ls_kernel, p->step * 0.5, 0, 0);
 
-                if (ref <= ls_kernel->cost)
+                if (i != best || ref <= ls_kernel->cost)
                     for (int u = 0; u < kernel->N; u++)
                         if (ls_kernel->independent_set[u] && !p->LS[i]->independent_set[reverse_map[u]])
                             local_search_add_vertex(g, p->LS[i], reverse_map[u]);
@@ -172,7 +160,7 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
 #pragma omp for
             for (int i = 0; i < p->N; i++)
                 if (i != best && p->LS[i]->cost == p->LS[best]->cost)
-                    local_search_scramble(g, p->LS[i], 4);
+                    local_search_perturbate(g, p->LS[i]);
 
 #pragma omp single
             {

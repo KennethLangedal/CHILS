@@ -91,6 +91,9 @@ void kernelize_csr(int N, const int *V, const int *E, const long long *W,
 
                 for (int i = V[v]; i < V[v + 1]; i++)
                 {
+                    if (!A[E[i]])
+                        continue;
+
                     A[E[i]] = 0;
                     kernelization_push_queue_dist_one(V, E, A, E[i], Nr, in_queue, queue, queue_size);
                 }

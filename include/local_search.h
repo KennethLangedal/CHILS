@@ -43,7 +43,7 @@ void local_search_aap(graph *g, local_search *ls, int u, int imp);
 
 void local_search_greedy(graph *g, local_search *ls);
 
-void local_search_scramble(graph *g, local_search *ls, int amount);
+void local_search_perturbate(graph *g, local_search *ls);
 
 void local_search_explore(graph *g, local_search *ls, double tl, int verbose, long long offset);
 

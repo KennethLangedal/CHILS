@@ -175,7 +175,7 @@ int reduction_extended_unconfined_csr(reduction_data *R, int N, const int *V, co
             break;
         }
 
-        tiny_solver_solve_subgraph(R->solver, 1.0, LLONG_MAX, dn, T, V, E, W, A);
+        tiny_solver_solve_subgraph(R->solver, 1.0, W[v] - sw, dn, T, V, E, W, A);
         if (R->solver->time_limit_exceeded)
             continue;
 
@@ -200,7 +200,7 @@ int reduction_extended_unconfined_csr(reduction_data *R, int N, const int *V, co
 
             int w = T[i];
             T[i] = T[dn - 1];
-            tiny_solver_solve_subgraph(R->solver, 1.0, LLONG_MAX, dn - 1, T, V, E, W, A);
+            tiny_solver_solve_subgraph(R->solver, 1.0, W[v] - sw, dn - 1, T, V, E, W, A);
 
             if (!R->solver->time_limit_exceeded && W[v] >= sw + R->solver->independent_set_weight)
             {
