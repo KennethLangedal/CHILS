@@ -7,6 +7,9 @@ typedef struct
     int N;
     double step;
 
+    long long cost;
+    double time;
+
     int *A;
     local_search **LS;
 } pils;

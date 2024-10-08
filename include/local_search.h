@@ -6,6 +6,7 @@ typedef struct
 {
     // Solution
     long long cost;
+    double time, time_ref;
     int *independent_set;
 
     // Queue structures

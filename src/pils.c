@@ -12,8 +12,10 @@ pils *pils_init(graph *g, int N)
     pils *p = malloc(sizeof(pils));
 
     p->N = N;
-
     p->step = 5.0;
+
+    p->cost = 0;
+    p->time = 0.0;
 
     p->A = malloc(sizeof(int) * g->N);
     for (int i = 0; i < g->N; i++)
@@ -50,9 +52,9 @@ void pils_print(pils *p, long long offset, double elapsed, int Nr)
         else if (p->LS[i]->cost < p->LS[worst]->cost)
             worst = i;
 
-    printf("\r%lld (%d) %lld (%d) %.2lf %d    ",
-           p->LS[best]->cost + offset, best,
-           p->LS[worst]->cost + offset, worst,
+    printf("\r%lld (%d %.2lf) %lld (%d %.2lf) %.2lf %d    ",
+           p->LS[best]->cost + offset, best, p->LS[best]->time,
+           p->LS[worst]->cost + offset, worst, p->LS[worst]->time,
            elapsed, Nr);
     fflush(stdout);
 }
@@ -125,6 +127,14 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
             /* Construct the CHILS core */
 #pragma omp single
             {
+                if (p->LS[best]->cost > p->cost)
+                {
+                    p->cost = p->LS[best]->cost;
+                    p->time = p->LS[best]->time;
+                    for (int i = 0; i < p->N; i++)
+                        if (p->LS[i]->cost == p->cost && p->LS[i]->time < p->time)
+                            p->time = p->LS[i]->time;
+                }
                 kernel = graph_subgraph(g, A, reverse_map);
             }
 
@@ -152,8 +162,24 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
                 local_search_free(ls_kernel);
             }
 
+            /* Find the best solution after LS on the CHILS core */
+            best = 0;
+            for (int i = 1; i < p->N; i++)
+            {
+                if (p->LS[i]->cost >= p->LS[best]->cost)
+                    best = i;
+            }
+
 #pragma omp single
             {
+                if (p->LS[best]->cost > p->cost)
+                {
+                    p->cost = p->LS[best]->cost;
+                    p->time = p->LS[best]->time;
+                    for (int i = 0; i < p->N; i++)
+                        if (p->LS[i]->cost == p->cost && p->LS[i]->time < p->time)
+                            p->time = p->LS[i]->time;
+                }
                 graph_free(kernel);
             }
 

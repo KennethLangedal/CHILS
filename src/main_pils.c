@@ -29,7 +29,7 @@ long long mwis_validate(graph *g, int *independent_set)
 
 const char *help = "PILS --- Parallel Iterated Local Search\n"
                    "\nThe output of the program without -v is a single line on the form:\n"
-                   "instance_name #vertices #edges W_after_10% W_after_50% W_after_t\n"
+                   "instance_name #vertices #edges W_after_10% W_after_50% W_after_t Best_t\n"
                    "\n-h \t\tDisplay this help message\n"
                    "-v \t\tVerbose mode, output continous updates to STDOUT\n"
                    "-g path* \tPath to the input graph in METIS format\n"
@@ -213,7 +213,7 @@ int main(int argc, char **argv)
     }
 
     long long w10, w50, w100;
-    double t10 = timeout * 0.1, t50 = timeout * 0.4, t100 = timeout * 0.5;
+    double t10 = timeout * 0.1, t50 = timeout * 0.4, t100 = timeout * 0.5, tb = 0.0;
 
     int *solution = malloc(sizeof(int) * g->N);
 
@@ -238,6 +238,8 @@ int main(int argc, char **argv)
         pils_run(g, p, t100, verbose, offset);
         w100 = mwis_validate(g, pils_get_best_independent_set(p)) + offset;
 
+        tb = p->time;
+
         int *best = pils_get_best_independent_set(p);
         for (int i = 0; i < g->N; i++)
             solution[i] = best[i];
@@ -261,14 +263,16 @@ int main(int argc, char **argv)
         local_search_explore(g, ls, t100, verbose, offset);
         w100 = mwis_validate(g, ls->independent_set) + offset;
 
+        tb = ls->time;
+
         for (int i = 0; i < g->N; i++)
             solution[i] = ls->independent_set[i];
 
         local_search_free(ls);
     }
 
-    printf("%s,%d,%d,%lld,%lld,%lld\n", graph_path + path_offset,
-           g->N, g->V[g->N] / 2, w10, w50, w100);
+    printf("%s,%d,%d,%lld,%lld,%lld,%.4lf\n", graph_path + path_offset,
+           g->N, g->V[g->N] / 2, w10, w50, w100, tb);
 
     if (solution_path != NULL)
     {

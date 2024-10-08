@@ -16,6 +16,8 @@ local_search *local_search_init(graph *g, unsigned int seed)
     local_search *ls = malloc(sizeof(local_search));
 
     ls->cost = 0;
+    ls->time = 0.0;
+    ls->time_ref = omp_get_wtime();
     ls->independent_set = malloc(sizeof(int) * g->N);
 
     ls->queue_count = g->N;
@@ -475,8 +477,7 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose, lo
         fflush(stdout);
     }
 
-    double start, end;
-    start = omp_get_wtime();
+    double start = omp_get_wtime();
 
     ls->log_enabled = 0;
     if (ls->cost == 0)
@@ -488,9 +489,7 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose, lo
         if ((c++ & ((1 << 12) - 1)) == 0)
         {
             c = 0;
-            end = omp_get_wtime();
-            double elapsed = end - start;
-            if (elapsed > tl)
+            if (omp_get_wtime() - start > tl)
                 break;
         }
 
@@ -504,13 +503,11 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose, lo
         if (ls->cost > best)
         {
             best = ls->cost;
+            ls->time = omp_get_wtime() - ls->time_ref;
             ls->log_count = 0;
             if (verbose)
             {
-                end = omp_get_wtime();
-                double elapsed = end - start;
-
-                printf("\r%lld %.2lf    ", ls->cost + offset, elapsed);
+                printf("\r%lld %.2lf    ", ls->cost + offset, ls->time);
                 fflush(stdout);
             }
         }
