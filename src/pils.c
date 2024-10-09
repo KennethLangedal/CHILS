@@ -204,12 +204,12 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
             {
                 if (Nr < MIN_CORE && i != best && (i % 2) == 0)
                 {
-                    p->LS[i]->log_enabled = 0;
-                    for (int j = 0; j < g->N; j++)
-                        if (p->LS[i]->independent_set[j])
-                            local_search_remove_vertex(g, p->LS[i], j);
-                    local_search_add_vertex(g, p->LS[i], rand_r(&p->LS[i]->seed) % g->N);
-                    // local_search_perturbate(g, p->LS[i]);
+                    // p->LS[i]->log_enabled = 0;
+                    // for (int j = 0; j < g->N; j++)
+                    //     if (p->LS[i]->independent_set[j])
+                    //         local_search_remove_vertex(g, p->LS[i], j);
+                    // local_search_add_vertex(g, p->LS[i], rand_r(&p->LS[i]->seed) % g->N);
+                    local_search_perturbate(g, p->LS[i]);
                 }
             }
 
