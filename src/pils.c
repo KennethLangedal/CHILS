@@ -59,6 +59,28 @@ void pils_print(pils *p, long long offset, double elapsed, int Nr)
     fflush(stdout);
 }
 
+int pils_find_last_best(pils *p)
+{
+    int best = 0;
+    for (int i = 1; i < p->N; i++)
+        if (p->LS[i]->cost >= p->LS[best]->cost)
+            best = i;
+    return best;
+}
+
+void pils_update_best(pils *p)
+{
+    for (int i = 0; i < p->N; i++)
+    {
+        if (p->LS[i]->cost > p->cost ||
+            (p->LS[i]->cost == p->cost && p->LS[i]->time < p->time))
+        {
+            p->cost = p->LS[i]->cost;
+            p->time = p->LS[i]->time;
+        }
+    }
+}
+
 void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
 {
     double start = omp_get_wtime();
@@ -83,14 +105,16 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
         {
             if (p->LS[i]->cost == 0 && i == 0)
                 local_search_in_order_solution(g, p->LS[i]);
-
-            local_search_greedy(g, p->LS[i]);
+            else if (p->LS[i]->cost == 0)
+                local_search_add_vertex(g, p->LS[i], rand_r(&p->LS[i]->seed) % g->N);
         }
 
 #pragma omp single
         {
             end = omp_get_wtime();
             elapsed = end - start;
+
+            pils_update_best(p);
 
             if (verbose)
                 pils_print(p, offset, elapsed, g->N);
@@ -102,7 +126,12 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
 #pragma omp for
             for (int i = 0; i < p->N; i++)
             {
-                local_search_explore(g, p->LS[i], p->step, 0, 0);
+                double remaining_time = tl - (omp_get_wtime() - start);
+                double duration = p->step;
+                if (remaining_time < duration)
+                    duration = remaining_time;
+                if (duration > 0.0)
+                    local_search_explore(g, p->LS[i], duration, 0, 0);
             }
 
             /* Mark the CHILS core */
@@ -117,24 +146,12 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
             }
 
             /* Find the best solution */
-            int best = 0;
-            for (int i = 1; i < p->N; i++)
-            {
-                if (p->LS[i]->cost >= p->LS[best]->cost)
-                    best = i;
-            }
+            int best = pils_find_last_best(p);
 
             /* Construct the CHILS core */
 #pragma omp single
             {
-                if (p->LS[best]->cost > p->cost)
-                {
-                    p->cost = p->LS[best]->cost;
-                    p->time = p->LS[best]->time;
-                    for (int i = 0; i < p->N; i++)
-                        if (p->LS[i]->cost == p->cost && p->LS[i]->time < p->time)
-                            p->time = p->LS[i]->time;
-                }
+                pils_update_best(p);
                 kernel = graph_subgraph(g, A, reverse_map);
             }
 
@@ -145,6 +162,14 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
                 if (kernel->N == 0)
                     continue;
 
+                double remaining_time = tl - (omp_get_wtime() - start);
+                double duration = p->step * 0.5;
+                if (remaining_time < duration)
+                    duration = remaining_time;
+
+                if (duration < 0.0)
+                    continue;
+
                 local_search *ls_kernel = local_search_init(kernel, i);
 
                 long long ref = 0;
@@ -152,41 +177,41 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
                     if (p->LS[i]->independent_set[reverse_map[u]])
                         ref += kernel->W[u];
 
-                local_search_explore(kernel, ls_kernel, p->step * 0.5, 0, 0);
+                local_search_explore(kernel, ls_kernel, duration, 0, 0);
 
                 if (ref <= ls_kernel->cost || (i != best && (i % 2) == 0))
                     for (int u = 0; u < kernel->N; u++)
                         if (ls_kernel->independent_set[u] && !p->LS[i]->independent_set[reverse_map[u]])
                             local_search_add_vertex(g, p->LS[i], reverse_map[u]);
 
+                if (ref < ls_kernel->cost)
+                    p->LS[i]->time = (omp_get_wtime() - p->LS[i]->time_ref) - (duration - ls_kernel->time);
+
                 local_search_free(ls_kernel);
             }
 
             /* Find the best solution after LS on the CHILS core */
-            best = 0;
-            for (int i = 1; i < p->N; i++)
-            {
-                if (p->LS[i]->cost >= p->LS[best]->cost)
-                    best = i;
-            }
+            best = pils_find_last_best(p);
 
 #pragma omp single
             {
-                if (p->LS[best]->cost > p->cost)
-                {
-                    p->cost = p->LS[best]->cost;
-                    p->time = p->LS[best]->time;
-                    for (int i = 0; i < p->N; i++)
-                        if (p->LS[i]->cost == p->cost && p->LS[i]->time < p->time)
-                            p->time = p->LS[i]->time;
-                }
+                pils_update_best(p);
                 graph_free(kernel);
             }
 
 #pragma omp for
             for (int i = 0; i < p->N; i++)
+            {
                 if (Nr < MIN_CORE && i != best && (i % 2) == 0)
-                    local_search_perturbate(g, p->LS[i]);
+                {
+                    p->LS[i]->log_enabled = 0;
+                    for (int j = 0; j < g->N; j++)
+                        if (p->LS[i]->independent_set[j])
+                            local_search_remove_vertex(g, p->LS[i], j);
+                    local_search_add_vertex(g, p->LS[i], rand_r(&p->LS[i]->seed) % g->N);
+                    // local_search_perturbate(g, p->LS[i]);
+                }
+            }
 
 #pragma omp single
             {

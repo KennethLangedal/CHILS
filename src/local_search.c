@@ -484,6 +484,12 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose, lo
         local_search_in_order_solution(g, ls);
     local_search_greedy(g, ls);
 
+    if (ls->cost > best)
+    {
+        best = ls->cost;
+        ls->time = omp_get_wtime() - ls->time_ref;
+    }
+
     while (1)
     {
         if ((c++ & ((1 << 12) - 1)) == 0)
