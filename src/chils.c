@@ -2,14 +2,13 @@
 #include <limits.h>
 #include <stdlib.h>
 
-#include "pils.h"
-#include "reductions.h"
+#include "chils.h"
 
 #define MIN_CORE 512
 
-pils *pils_init(graph *g, int N)
+chils *chils_init(graph *g, int N)
 {
-    pils *p = malloc(sizeof(pils));
+    chils *p = malloc(sizeof(chils));
 
     p->N = N;
     p->step = 5.0;
@@ -33,7 +32,7 @@ pils *pils_init(graph *g, int N)
     return p;
 }
 
-void pils_free(pils *p)
+void chils_free(chils *p)
 {
     for (int i = 0; i < p->N; i++)
         local_search_free(p->LS[i]);
@@ -43,7 +42,7 @@ void pils_free(pils *p)
     free(p);
 }
 
-void pils_print(pils *p, long long offset, double elapsed, int Nr)
+void chils_print(chils *p, double elapsed, int Nr)
 {
     int best = 0, worst = 0;
     for (int i = 1; i < p->N; i++)
@@ -53,13 +52,13 @@ void pils_print(pils *p, long long offset, double elapsed, int Nr)
             worst = i;
 
     printf("\r%lld (%d %.2lf) %lld (%d %.2lf) %.2lf %d    ",
-           p->LS[best]->cost + offset, best, p->LS[best]->time,
-           p->LS[worst]->cost + offset, worst, p->LS[worst]->time,
+           p->LS[best]->cost, best, p->LS[best]->time,
+           p->LS[worst]->cost, worst, p->LS[worst]->time,
            elapsed, Nr);
     fflush(stdout);
 }
 
-int pils_find_last_best(pils *p)
+int chils_find_last_best(chils *p)
 {
     int best = 0;
     for (int i = 1; i < p->N; i++)
@@ -68,7 +67,7 @@ int pils_find_last_best(pils *p)
     return best;
 }
 
-void pils_update_best(pils *p)
+void chils_update_best(chils *p)
 {
     for (int i = 0; i < p->N; i++)
     {
@@ -81,7 +80,7 @@ void pils_update_best(pils *p)
     }
 }
 
-void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
+void chils_run(graph *g, chils *p, double tl, int verbose)
 {
     double start = omp_get_wtime();
     double end = omp_get_wtime();
@@ -89,8 +88,8 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
 
     if (verbose)
     {
-        printf("Running PILS for %.2lf seconds\n", tl);
-        pils_print(p, offset, elapsed, g->N);
+        printf("Running chils for %.2lf seconds\n", tl);
+        chils_print(p, elapsed, g->N);
     }
 
     graph *kernel = NULL;
@@ -114,10 +113,10 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
             end = omp_get_wtime();
             elapsed = end - start;
 
-            pils_update_best(p);
+            chils_update_best(p);
 
             if (verbose)
-                pils_print(p, offset, elapsed, g->N);
+                chils_print(p, elapsed, g->N);
         }
 
         while (elapsed < tl)
@@ -131,7 +130,7 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
                 if (remaining_time < duration)
                     duration = remaining_time;
                 if (duration > 0.0)
-                    local_search_explore(g, p->LS[i], duration, 0, 0);
+                    local_search_explore(g, p->LS[i], duration, 0);
             }
 
             /* Mark the CHILS core */
@@ -146,12 +145,12 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
             }
 
             /* Find the best solution */
-            int best = pils_find_last_best(p);
+            int best = chils_find_last_best(p);
 
             /* Construct the CHILS core */
 #pragma omp single
             {
-                pils_update_best(p);
+                chils_update_best(p);
                 kernel = graph_subgraph(g, A, reverse_map);
             }
 
@@ -177,7 +176,7 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
                     if (p->LS[i]->independent_set[reverse_map[u]])
                         ref += kernel->W[u];
 
-                local_search_explore(kernel, ls_kernel, duration, 0, 0);
+                local_search_explore(kernel, ls_kernel, duration, 0);
 
                 if (ref <= ls_kernel->cost || (i != best && (i % 2) == 0))
                     for (int u = 0; u < kernel->N; u++)
@@ -191,11 +190,11 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
             }
 
             /* Find the best solution after LS on the CHILS core */
-            best = pils_find_last_best(p);
+            best = chils_find_last_best(p);
 
 #pragma omp single
             {
-                pils_update_best(p);
+                chils_update_best(p);
                 graph_free(kernel);
             }
 
@@ -203,14 +202,7 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
             for (int i = 0; i < p->N; i++)
             {
                 if (Nr < MIN_CORE && i != best && (i % 2) == 0)
-                {
-                    // p->LS[i]->log_enabled = 0;
-                    // for (int j = 0; j < g->N; j++)
-                    //     if (p->LS[i]->independent_set[j])
-                    //         local_search_remove_vertex(g, p->LS[i], j);
-                    // local_search_add_vertex(g, p->LS[i], rand_r(&p->LS[i]->seed) % g->N);
-                    local_search_perturbate(g, p->LS[i]);
-                }
+                    local_search_perturbe(g, p->LS[i]);
             }
 
 #pragma omp single
@@ -218,7 +210,7 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
                 end = omp_get_wtime();
                 elapsed = end - start;
                 if (verbose)
-                    pils_print(p, offset, elapsed, Nr);
+                    chils_print(p, elapsed, Nr);
                 Nr = 0;
             }
         }
@@ -231,7 +223,7 @@ void pils_run(graph *g, pils *p, double tl, int verbose, long long offset)
     free(A);
 }
 
-void pils_set_solution(graph *g, pils *p, const int *independent_set)
+void chils_set_solution(graph *g, chils *p, const int *independent_set)
 {
 #pragma omp for
     for (int i = 0; i < p->N; i++)
@@ -240,7 +232,7 @@ void pils_set_solution(graph *g, pils *p, const int *independent_set)
                 local_search_add_vertex(g, p->LS[i], j);
 }
 
-int *pils_get_best_independent_set(pils *p)
+int *chils_get_best_independent_set(chils *p)
 {
     int best = 0;
     for (int i = 0; i < p->N; i++)

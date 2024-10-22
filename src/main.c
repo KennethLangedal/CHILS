@@ -4,9 +4,8 @@
 #include <omp.h>
 
 #include "graph.h"
-#include "reductions.h"
 #include "local_search.h"
-#include "pils.h"
+#include "chils.h"
 
 long long mwis_validate(graph *g, int *independent_set)
 {
@@ -27,19 +26,18 @@ long long mwis_validate(graph *g, int *independent_set)
     return cost;
 }
 
-const char *help = "PILS --- Parallel Iterated Local Search\n"
+const char *help = "CHILS --- Concurrent Hybrid Iterated Local Search\n"
                    "\nThe output of the program without -v is a single line on the form:\n"
-                   "instance_name #vertices #edges W_after_10% W_after_50% W_after_t Best_t\n"
+                   "instance_name,#vertices,#edges,W_after_10%,W_after_50%,W_after_t,Best_t\n"
                    "\n-h \t\tDisplay this help message\n"
                    "-v \t\tVerbose mode, output continous updates to STDOUT\n"
                    "-g path* \tPath to the input graph in METIS format\n"
-                   "-i path* \tPath to initial solution (1-indexed list)\n"
+                   "-i path \tPath to initial solution (1-indexed list)\n"
                    "-o path \tPath to store the best solution found \t\t default not stored\n"
-                   "-p N \t\tRun PILS with N concurrent solutions \t\t default 1 (only local search)\n"
+                   "-p N \t\tRun CHILS with N concurrent solutions \t\t default 1 (only local search)\n"
                    "-t sec \t\tTimout in seconds \t\t\t\t default 3600 seconds\n"
-                   "-s sec \t\tAlternating interval for PILS \t\t\t default 5 seconds\n"
-                   "-r sec \t\tTime to spend on initial reductions \t\t default 0 seconds\n"
-                   "-q N \t\tMax queue size after shake \t\t\t default 32\n"
+                   "-s sec \t\tAlternating interval for CHILS \t\t\t default 5 seconds\n"
+                   "-q N \t\tMax queue size after perturbe \t\t\t default 32\n"
                    "-c T \t\tSet a specific number of threads  \t\t default OMP_NUM_THREADS\n"
                    "\n* Mandatory input";
 
@@ -48,12 +46,12 @@ int main(int argc, char **argv)
     char *graph_path = NULL,
          *initial_solution_path = NULL,
          *solution_path = NULL;
-    int verbose = 0, run_pils = 1, run_reductions = 0, max_queue = 32, num_threads = -1;
+    int verbose = 0, run_chils = 1, max_queue = 32, num_threads = -1;
     double timeout = 3600, step = 5, reduction_timout = 30;
 
     int command;
 
-    while ((command = getopt(argc, argv, "hvg:i:o:p:t:s:r:q:c:")) != -1)
+    while ((command = getopt(argc, argv, "hvg:i:o:p:t:s:q:c:")) != -1)
     {
         switch (command)
         {
@@ -73,17 +71,13 @@ int main(int argc, char **argv)
             solution_path = optarg;
             break;
         case 'p':
-            run_pils = atoi(optarg);
+            run_chils = atoi(optarg);
             break;
         case 't':
             timeout = atof(optarg);
             break;
         case 's':
             step = atof(optarg);
-            break;
-        case 'r':
-            run_reductions = 1;
-            reduction_timout = atof(optarg);
             break;
         case 'q':
             max_queue = atoi(optarg);
@@ -160,10 +154,10 @@ int main(int argc, char **argv)
 
     if (verbose)
     {
-        if (run_pils <= 1)
+        if (run_chils <= 1)
             printf("Running iterated local search\n");
         else
-            printf("Running PILS using %d concurrent solutions\n", run_pils);
+            printf("Running CHILS using %d concurrent solutions\n", run_chils);
 
         printf("Input: \t\t\t%s\n", graph_path + path_offset);
         printf("Vertices: \t\t%d\n", g->N);
@@ -172,44 +166,10 @@ int main(int argc, char **argv)
             printf("Output: \t\t%s\n", solution_path);
         printf("Tiomeout: \t\t%.2lf seconds\n", timeout);
         printf("Max queue size: \t%d\n", max_queue);
-        if (run_pils > 1)
-            printf("PILS interval: \t\t%.2lf seconds\n", step);
+        if (run_chils > 1)
+            printf("CHILS interval: \t\t%.2lf seconds\n", step);
         if (initial_solution_path != NULL)
             printf("Initial solution: \t%lld\n", initial_solution_weight);
-    }
-
-    int *reverse_mapping = NULL;
-    int *original_solution = NULL;
-    graph *original_graph = NULL;
-    long long offset = 0;
-
-    if (run_reductions && initial_solution == NULL)
-    {
-        reverse_mapping = malloc(sizeof(int) * g->N);
-        original_solution = malloc(sizeof(int) * g->N);
-        for (int i = 0; i < g->N; i++)
-            original_solution[i] = 0;
-        int *A = malloc(sizeof(int) * g->N);
-        for (int i = 0; i < g->N; i++)
-            A[i] = 1;
-
-        kernelize_csr(g->N, g->V, g->E, g->W, A,
-                      original_solution, &offset, reduction_timout, 7,
-                      reduction_neighborhood_csr,
-                      reduction_clique_csr,
-                      reduction_domination_csr,
-                      reduction_single_edge_csr,
-                      reduction_extended_single_edge_csr,
-                      reduction_extended_twin_csr,
-                      reduction_extended_unconfined_csr);
-
-        original_graph = g;
-        g = graph_subgraph(original_graph, A, reverse_mapping);
-
-        if (verbose)
-            printf("Kernel: \t\t|V|=%d |E|=%d\n", g->N, g->V[g->N] / 2);
-
-        free(A);
     }
 
     long long w10, w50, w100;
@@ -217,34 +177,34 @@ int main(int argc, char **argv)
 
     int *solution = malloc(sizeof(int) * g->N);
 
-    if (run_pils > 1)
+    if (run_chils > 1)
     {
         if (num_threads > 0)
             omp_set_num_threads(num_threads);
 
-        pils *p = pils_init(g, run_pils);
+        chils *p = chils_init(g, run_chils);
         p->step = step;
 
         if (initial_solution != NULL)
-            pils_set_solution(g, p, initial_solution);
+            chils_set_solution(g, p, initial_solution);
 
-        for (int i = 0; i < run_pils; i++)
+        for (int i = 0; i < run_chils; i++)
             p->LS[i]->max_queue = max_queue + (4 * i);
 
-        pils_run(g, p, t10, verbose, offset);
-        w10 = mwis_validate(g, pils_get_best_independent_set(p)) + offset;
-        pils_run(g, p, t50, verbose, offset);
-        w50 = mwis_validate(g, pils_get_best_independent_set(p)) + offset;
-        pils_run(g, p, t100, verbose, offset);
-        w100 = mwis_validate(g, pils_get_best_independent_set(p)) + offset;
+        chils_run(g, p, t10, verbose);
+        w10 = mwis_validate(g, chils_get_best_independent_set(p));
+        chils_run(g, p, t50, verbose);
+        w50 = mwis_validate(g, chils_get_best_independent_set(p));
+        chils_run(g, p, t100, verbose);
+        w100 = mwis_validate(g, chils_get_best_independent_set(p));
 
         tb = p->time;
 
-        int *best = pils_get_best_independent_set(p);
+        int *best = chils_get_best_independent_set(p);
         for (int i = 0; i < g->N; i++)
             solution[i] = best[i];
 
-        pils_free(p);
+        chils_free(p);
     }
     else
     {
@@ -256,12 +216,12 @@ int main(int argc, char **argv)
                     local_search_add_vertex(g, ls, u);
 
         ls->max_queue = max_queue;
-        local_search_explore(g, ls, t10, verbose, offset);
-        w10 = mwis_validate(g, ls->independent_set) + offset;
-        local_search_explore(g, ls, t50, verbose, offset);
-        w50 = mwis_validate(g, ls->independent_set) + offset;
-        local_search_explore(g, ls, t100, verbose, offset);
-        w100 = mwis_validate(g, ls->independent_set) + offset;
+        local_search_explore(g, ls, t10, verbose);
+        w10 = mwis_validate(g, ls->independent_set);
+        local_search_explore(g, ls, t50, verbose);
+        w50 = mwis_validate(g, ls->independent_set);
+        local_search_explore(g, ls, t100, verbose);
+        w100 = mwis_validate(g, ls->independent_set);
 
         tb = ls->time;
 
@@ -276,13 +236,6 @@ int main(int argc, char **argv)
 
     if (solution_path != NULL)
     {
-        if (original_solution != NULL)
-        {
-            for (int u = 0; u < g->N; u++)
-                if (solution[u])
-                    original_solution[reverse_mapping[u]] = 1;
-        }
-
         f = fopen(solution_path, "w");
         if (f == NULL)
         {
@@ -293,18 +246,9 @@ int main(int argc, char **argv)
             if (verbose)
                 printf("\nStoring solution of size %lld to %s\n", w100, solution_path);
 
-            if (original_solution == NULL)
-            {
-                for (int i = 0; i < g->N; i++)
-                    if (solution[i])
-                        fprintf(f, "%d\n", i + 1);
-            }
-            else
-            {
-                for (int i = 0; i < original_graph->N; i++)
-                    if (original_solution[i])
-                        fprintf(f, "%d\n", i + 1);
-            }
+            for (int i = 0; i < g->N; i++)
+                if (solution[i])
+                    fprintf(f, "%d\n", i + 1);
 
             fclose(f);
         }
@@ -312,10 +256,7 @@ int main(int argc, char **argv)
 
     free(solution);
     free(initial_solution);
-    free(original_solution);
-    free(reverse_mapping);
     graph_free(g);
-    graph_free(original_graph);
 
     return 0;
 }

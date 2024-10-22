@@ -419,7 +419,7 @@ void local_search_greedy(graph *g, local_search *ls)
     }
 }
 
-void local_search_perturbate(graph *g, local_search *ls)
+void local_search_perturbe(graph *g, local_search *ls)
 {
     int u = ls->pool[rand_r(&ls->seed) % ls->pool_size];
     int q = 0;
@@ -464,7 +464,7 @@ void local_search_perturbate(graph *g, local_search *ls)
     }
 }
 
-void local_search_explore(graph *g, local_search *ls, double tl, int verbose, long long offset)
+void local_search_explore(graph *g, local_search *ls, double tl, int verbose)
 {
     int c = 0, q = 0;
 
@@ -473,7 +473,7 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose, lo
     if (verbose)
     {
         printf("Running local search for %.2lf seconds\n", tl);
-        printf("\r%lld %.2lf    ", ls->cost + offset, 0.0);
+        printf("\r%lld %.2lf    ", ls->cost, 0.0);
         fflush(stdout);
     }
 
@@ -502,7 +502,7 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose, lo
         ls->log_count = 0;
         ls->log_enabled = 1;
 
-        local_search_perturbate(g, ls);
+        local_search_perturbe(g, ls);
 
         local_search_greedy(g, ls);
 
@@ -513,7 +513,7 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose, lo
             ls->log_count = 0;
             if (verbose)
             {
-                printf("\r%lld %.2lf    ", ls->cost + offset, ls->time);
+                printf("\r%lld %.2lf    ", ls->cost, ls->time);
                 fflush(stdout);
             }
         }

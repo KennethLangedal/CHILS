@@ -3,29 +3,20 @@ SHELL = /bin/bash
 CC = gcc
 CFLAGS = -std=gnu17 -O3 -march=native -I include -fopenmp -DNDEBUG
 
-OBJ_PILS = main_pils.o graph.o reductions.o local_search.o pils.o tiny_solver.o \
-		   neighborhood.o unconfined.o domination.o clique.o extended_twin.o single_edge.o extended_single_edge.o
-OBJ_KERNEL = main_kernel.o graph.o reductions.o tiny_solver.o local_search.o pils.o\
-			 clique.o unconfined.o neighborhood.o domination.o \
-			 single_edge.o extended_single_edge.o twin.o extended_twin.o heavy_vertex.o
+OBJ_CHILS = main.o graph.o local_search.o chils.o
+OBJ_CHILS := $(addprefix bin/, $(OBJ_CHILS))
 
-OBJ_PILS := $(addprefix bin/, $(OBJ_PILS))
-OBJ_KERNEL := $(addprefix bin/, $(OBJ_KERNEL))
-
-DEP = $(OBJ_PILS) $(OBJ_KERNEL)
+DEP = $(OBJ_CHILS)
 DEP := $(sort $(DEP))
 
-vpath %.c src src/reductions
+vpath %.c src
 vpath %.h include
 
-all : PILS KERNEL
+all : CHILS
 
 -include $(DEP:.o=.d)
 
-PILS : $(OBJ_PILS)
-	$(CC) $(CFLAGS) -o $@ $^ -lm
-
-KERNEL : $(OBJ_KERNEL)
+CHILS : $(OBJ_CHILS)
 	$(CC) $(CFLAGS) -o $@ $^ -lm
 
 bin/%.o : %.c
@@ -33,4 +24,4 @@ bin/%.o : %.c
 
 .PHONY : clean
 clean :
-	rm -f PILS KERNEL $(DEP) $(DEP:.o=.d)
+	rm -f CHILS $(DEP) $(DEP:.o=.d)
