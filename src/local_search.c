@@ -488,6 +488,11 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose)
     {
         best = ls->cost;
         ls->time = omp_get_wtime() - ls->time_ref;
+        if (verbose)
+        {
+            printf("\r%lld %.2lf    ", ls->cost, ls->time);
+            fflush(stdout);
+        }
     }
 
     while (1)
