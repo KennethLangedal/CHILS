@@ -105,7 +105,7 @@ void chils_run(graph *g, chils *p, double tl, long long cl, long long il, int ve
     int *s2 = malloc(sizeof(int) * 512);
     int Nr, Mr;
 
-#pragma omp parallel shared(elapsed, kernel, reverse_map, forward_map, s1, s2, A, Nr)
+#pragma omp parallel shared(elapsed, kernel, reverse_map, forward_map, s1, s2, A, Nr, Mr)
     {
 #pragma omp for
         for (int i = 0; i < p->N; i++)
