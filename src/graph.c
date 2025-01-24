@@ -203,30 +203,28 @@ void graph_subgraph_par(graph *g, graph *sg, int *mask, int *reverse_map, int *f
         Mo += s2[i];
     }
 
-    N = 0;
-#pragma omp for
-    for (int u = 0; u < g->N; u++)
-    {
-        forward_map[u] = N + No;
-        reverse_map[N + No] = u;
-        N++;
-
-        sg->W[forward_map[u]] = g->W[u];
-        sg->V[forward_map[u]] = M + Mo;
-    }
-
-    if (tid == nt - 1)
-    {
-        sg->N = No + N;
-        sg->V[sg->N] = M + Mo;
-    }
-
-    M = 0;
+    N = No;
 #pragma omp for
     for (int u = 0; u < g->N; u++)
     {
         if (!mask[u])
             continue;
+
+        forward_map[u] = N;
+        reverse_map[N] = u;
+        N++;
+
+        sg->W[forward_map[u]] = g->W[u];
+    }
+
+    M = Mo;
+#pragma omp for nowait
+    for (int u = 0; u < g->N; u++)
+    {
+        if (!mask[u])
+            continue;
+
+        sg->V[forward_map[u]] = M;
 
         for (int i = g->V[u]; i < g->V[u + 1]; i++)
         {
@@ -238,4 +236,11 @@ void graph_subgraph_par(graph *g, graph *sg, int *mask, int *reverse_map, int *f
             M++;
         }
     }
+
+    if (tid == nt - 1)
+    {
+        sg->N = N;
+        sg->V[sg->N] = M;
+    }
+#pragma omp barrier
 }
