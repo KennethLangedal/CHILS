@@ -215,7 +215,7 @@ void graph_subgraph_par(graph *g, graph *sg, int *mask, int *reverse_map, int *f
         sg->V[forward_map[u]] = M + Mo;
     }
 
-    if (tid == nt)
+    if (tid == nt - 1)
     {
         sg->N = No + N;
         sg->V[sg->N] = M + Mo;
