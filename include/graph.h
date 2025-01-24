@@ -16,4 +16,7 @@ void graph_free(graph *g);
 
 int graph_validate(graph *g);
 
-graph *graph_subgraph(graph *g, int *mask, int *reverse_mapping);
+graph *graph_subgraph(graph *g, int *mask, int *reverse_map);
+
+// Should be called inside parallel region
+void graph_subgraph_par(graph *g, graph *sg, int *mask, int *reverse_map, int *forward_map, int *s1, int *s2);

@@ -6,7 +6,7 @@
 
 #define MIN_CORE 512
 
-chils *chils_init(graph *g, int N)
+chils *chils_init(graph *g, int N, unsigned int seed)
 {
     chils *p = malloc(sizeof(chils));
 
@@ -26,7 +26,7 @@ chils *chils_init(graph *g, int N)
     {
 #pragma omp for
         for (int i = 0; i < N; i++)
-            p->LS[i] = local_search_init(g, i);
+            p->LS[i] = local_search_init(g, seed + i);
     }
 
     return p;
@@ -42,19 +42,20 @@ void chils_free(chils *p)
     free(p);
 }
 
-void chils_print(chils *p, double elapsed, int Nr)
+void chils_print(chils *p, double elapsed, int Nr, int Mr)
 {
     int best = 0, worst = 0;
     for (int i = 1; i < p->N; i++)
-        if (p->LS[i]->cost >= p->LS[best]->cost)
+        if (p->LS[i]->cost > p->LS[best]->cost ||
+            (p->LS[i]->cost == p->LS[best]->cost && p->LS[i]->time < p->LS[best]->time))
             best = i;
         else if (p->LS[i]->cost < p->LS[worst]->cost)
             worst = i;
 
-    printf("\r%lld (%d %.2lf) %lld (%d %.2lf) %.2lf %d    ",
+    printf("\r%lld (%d %.2lf) %lld (%d %.2lf) %.2lf %d %d         ",
            p->LS[best]->cost, best, p->LS[best]->time,
            p->LS[worst]->cost, worst, p->LS[worst]->time,
-           elapsed, Nr);
+           elapsed, Nr, Mr);
     fflush(stdout);
 }
 
@@ -80,7 +81,7 @@ void chils_update_best(chils *p)
     }
 }
 
-void chils_run(graph *g, chils *p, double tl, int verbose)
+void chils_run(graph *g, chils *p, double tl, long long cl, long long il, int verbose)
 {
     double start = omp_get_wtime();
     double end = omp_get_wtime();
@@ -89,15 +90,22 @@ void chils_run(graph *g, chils *p, double tl, int verbose)
     if (verbose)
     {
         printf("Running chils for %.2lf seconds\n", tl);
-        chils_print(p, elapsed, g->N);
+        chils_print(p, elapsed, g->N, g->V[g->N]);
     }
 
-    graph *kernel = NULL;
+    graph *kernel = malloc(sizeof(graph));
+    kernel->N = 0;
+    kernel->V = malloc(sizeof(int) * (g->N + 1));
+    kernel->E = malloc(sizeof(int) * g->V[g->N]);
+    kernel->W = malloc(sizeof(long long) * g->N);
     int *reverse_map = malloc(sizeof(int) * g->N);
+    int *forward_map = malloc(sizeof(int) * g->N);
     int *A = malloc(sizeof(int) * g->N);
-    int Nr;
+    int *s1 = malloc(sizeof(int) * 512);
+    int *s2 = malloc(sizeof(int) * 512);
+    int Nr, Mr;
 
-#pragma omp parallel shared(elapsed, kernel, reverse_map, A, Nr)
+#pragma omp parallel shared(elapsed, kernel, reverse_map, forward_map, s1, s2, A, Nr)
     {
 #pragma omp for
         for (int i = 0; i < p->N; i++)
@@ -116,10 +124,11 @@ void chils_run(graph *g, chils *p, double tl, int verbose)
             chils_update_best(p);
 
             if (verbose)
-                chils_print(p, elapsed, g->N);
+                chils_print(p, elapsed, g->N, g->V[g->N]);
         }
 
-        while (elapsed < tl)
+        int c = 0;
+        while (c++ < cl && elapsed < tl)
         {
             /* Full graph LS */
 #pragma omp for
@@ -130,7 +139,7 @@ void chils_run(graph *g, chils *p, double tl, int verbose)
                 if (remaining_time < duration)
                     duration = remaining_time;
                 if (duration > 0.0)
-                    local_search_explore(g, p->LS[i], duration, 0);
+                    local_search_explore(g, p->LS[i], duration, il, 0);
             }
 
             /* Mark the CHILS core */
@@ -151,8 +160,11 @@ void chils_run(graph *g, chils *p, double tl, int verbose)
 #pragma omp single
             {
                 chils_update_best(p);
-                kernel = graph_subgraph(g, A, reverse_map);
+                if (verbose)
+                    chils_print(p, elapsed, g->N, g->V[g->N]);
+                // kernel = graph_subgraph(g, A, reverse_map);
             }
+            graph_subgraph_par(g, kernel, A, reverse_map, forward_map, s1, s2);
 
             /* CHILS core LS */
 #pragma omp for
@@ -170,13 +182,14 @@ void chils_run(graph *g, chils *p, double tl, int verbose)
                     continue;
 
                 local_search *ls_kernel = local_search_init(kernel, i);
+                ls_kernel->time_ref = p->LS[i]->time_ref;
 
                 long long ref = 0;
                 for (int u = 0; u < kernel->N; u++)
                     if (p->LS[i]->independent_set[reverse_map[u]])
                         ref += kernel->W[u];
 
-                local_search_explore(kernel, ls_kernel, duration, 0);
+                local_search_explore(kernel, ls_kernel, duration, il, 0);
 
                 if (ref <= ls_kernel->cost || (i != best && (i % 2) == 0))
                     for (int u = 0; u < kernel->N; u++)
@@ -184,7 +197,7 @@ void chils_run(graph *g, chils *p, double tl, int verbose)
                             local_search_add_vertex(g, p->LS[i], reverse_map[u]);
 
                 if (ref < ls_kernel->cost)
-                    p->LS[i]->time = (omp_get_wtime() - p->LS[i]->time_ref) - (duration - ls_kernel->time);
+                    p->LS[i]->time = ls_kernel->time;
 
                 local_search_free(ls_kernel);
             }
@@ -194,8 +207,9 @@ void chils_run(graph *g, chils *p, double tl, int verbose)
 
 #pragma omp single
             {
+                Mr = kernel->V[kernel->N];
                 chils_update_best(p);
-                graph_free(kernel);
+                // graph_free(kernel);
             }
 
 #pragma omp for
@@ -210,7 +224,7 @@ void chils_run(graph *g, chils *p, double tl, int verbose)
                 end = omp_get_wtime();
                 elapsed = end - start;
                 if (verbose)
-                    chils_print(p, elapsed, Nr);
+                    chils_print(p, elapsed, Nr, Mr);
                 Nr = 0;
             }
         }
@@ -219,8 +233,12 @@ void chils_run(graph *g, chils *p, double tl, int verbose)
     if (verbose)
         printf("\n");
 
+    graph_free(kernel);
     free(reverse_map);
+    free(forward_map);
     free(A);
+    free(s1);
+    free(s2);
 }
 
 void chils_set_solution(graph *g, chils *p, const int *independent_set)

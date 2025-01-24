@@ -20,7 +20,7 @@ typedef struct
     int *tabu, *tightness, *temp, *mask, *pool;
 
     // Action log
-    int log_count, log_enabled;
+    int log_count, log_alloc, log_enabled;
     int *log;
 
     unsigned int seed;
@@ -46,6 +46,6 @@ void local_search_greedy(graph *g, local_search *ls);
 
 void local_search_perturbe(graph *g, local_search *ls);
 
-void local_search_explore(graph *g, local_search *ls, double tl, int verbose);
+void local_search_explore(graph *g, local_search *ls, double tl, long long il, int verbose);
 
 void local_search_unwind(graph *g, local_search *ls, int t);

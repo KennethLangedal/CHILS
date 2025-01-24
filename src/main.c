@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <stdint.h>
+#include <time.h>
 #include <omp.h>
 
 #include "graph.h"
@@ -39,6 +41,10 @@ const char *help = "CHILS --- Concurrent Hybrid Iterated Local Search\n"
                    "-s sec \t\tAlternating interval for CHILS \t\t\t default 5 seconds\n"
                    "-q N \t\tMax queue size after perturbe \t\t\t default 32\n"
                    "-c T \t\tSet a specific number of threads  \t\t default OMP_NUM_THREADS\n"
+                   "-r s \t\tSet a specific random seed \t\t\t default time(NULL)\n"
+                   "\n"
+                   "-n it \t\tMax CHILS iterations \t\t\t\t default inf\n"
+                   "-m it \t\tAlternating iteration limit for CHILS \t\t default inf\n"
                    "\n* Mandatory input";
 
 int main(int argc, char **argv)
@@ -49,9 +55,13 @@ int main(int argc, char **argv)
     int verbose = 0, run_chils = 1, max_queue = 32, num_threads = -1;
     double timeout = 3600, step = 5, reduction_timout = 30;
 
+    long long cl = INT64_MAX, il = INT64_MAX;
+
+    unsigned int seed = time(NULL);
+
     int command;
 
-    while ((command = getopt(argc, argv, "hvg:i:o:p:t:s:q:c:")) != -1)
+    while ((command = getopt(argc, argv, "hvg:i:o:p:t:n:s:m:q:c:r:")) != -1)
     {
         switch (command)
         {
@@ -76,14 +86,23 @@ int main(int argc, char **argv)
         case 't':
             timeout = atof(optarg);
             break;
+        case 'n':
+            cl = atoll(optarg);
+            break;
         case 's':
             step = atof(optarg);
+            break;
+        case 'm':
+            il = atoll(optarg);
             break;
         case 'q':
             max_queue = atoi(optarg);
             break;
         case 'c':
             num_threads = atoi(optarg);
+            break;
+        case 'r':
+            seed = atoi(optarg);
             break;
         case '?':
             return 1;
@@ -167,13 +186,14 @@ int main(int argc, char **argv)
         printf("Tiomeout: \t\t%.2lf seconds\n", timeout);
         printf("Max queue size: \t%d\n", max_queue);
         if (run_chils > 1)
-            printf("CHILS interval: \t\t%.2lf seconds\n", step);
+            printf("CHILS interval: \t%.2lf seconds\n", step);
         if (initial_solution_path != NULL)
             printf("Initial solution: \t%lld\n", initial_solution_weight);
     }
 
     long long w10, w50, w100;
     double t10 = timeout * 0.1, t50 = timeout * 0.4, t100 = timeout * 0.5, tb = 0.0;
+    long long c10 = cl / 10ll, c50 = (cl / 10ll) * 4, c100 = (cl / 10ll) * 5;
 
     int *solution = malloc(sizeof(int) * g->N);
 
@@ -182,7 +202,7 @@ int main(int argc, char **argv)
         if (num_threads > 0)
             omp_set_num_threads(num_threads);
 
-        chils *p = chils_init(g, run_chils);
+        chils *p = chils_init(g, run_chils, seed);
         p->step = step;
 
         if (initial_solution != NULL)
@@ -191,11 +211,11 @@ int main(int argc, char **argv)
         for (int i = 0; i < run_chils; i++)
             p->LS[i]->max_queue = max_queue + (4 * i);
 
-        chils_run(g, p, t10, verbose);
+        chils_run(g, p, t10, c10, il, verbose);
         w10 = mwis_validate(g, chils_get_best_independent_set(p));
-        chils_run(g, p, t50, verbose);
+        chils_run(g, p, t50, c50, il, verbose);
         w50 = mwis_validate(g, chils_get_best_independent_set(p));
-        chils_run(g, p, t100, verbose);
+        chils_run(g, p, t100, c100, il, verbose);
         w100 = mwis_validate(g, chils_get_best_independent_set(p));
 
         tb = p->time;
@@ -216,11 +236,11 @@ int main(int argc, char **argv)
                     local_search_add_vertex(g, ls, u);
 
         ls->max_queue = max_queue;
-        local_search_explore(g, ls, t10, verbose);
+        local_search_explore(g, ls, t10, il, verbose);
         w10 = mwis_validate(g, ls->independent_set);
-        local_search_explore(g, ls, t50, verbose);
+        local_search_explore(g, ls, t50, il, verbose);
         w50 = mwis_validate(g, ls->independent_set);
-        local_search_explore(g, ls, t100, verbose);
+        local_search_explore(g, ls, t100, il, verbose);
         w100 = mwis_validate(g, ls->independent_set);
 
         tb = ls->time;

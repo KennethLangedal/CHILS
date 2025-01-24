@@ -5,10 +5,9 @@
 #include <assert.h>
 #include <omp.h>
 
-#define MAX_GUESS 512
-#define MAX_TWO_ONE_DEGREE 1024
-#define AAP_LIMIT 10000000
-#define LOG_LIMIT 8
+#define MAX_GUESS 128
+#define MAX_TWO_ONE_DEGREE (1 << 11)
+#define AAP_LIMIT (1 << 16)
 #define DEFAULT_QUEUE_SIZE 32
 
 local_search *local_search_init(graph *g, unsigned int seed)
@@ -36,8 +35,9 @@ local_search *local_search_init(graph *g, unsigned int seed)
     ls->pool = malloc(sizeof(int) * g->N);
 
     ls->log_count = 0;
+    ls->log_alloc = g->N;
     ls->log_enabled = 0;
-    ls->log = malloc(sizeof(int) * g->N * LOG_LIMIT);
+    ls->log = malloc(sizeof(int) * ls->log_alloc);
 
     ls->seed = seed;
 
@@ -131,12 +131,13 @@ void local_search_remove_vertex(graph *g, local_search *ls, int u)
     assert(ls->independent_set[u] && !ls->tabu[u]);
 
     if (ls->log_enabled)
-        ls->log[ls->log_count++] = u;
-
-    if (ls->log_count >= g->N * 8)
     {
-        fprintf(stderr, "Log count exceeded, this should never happen\n");
-        exit(1);
+        if (ls->log_count >= ls->log_alloc)
+        {
+            ls->log_alloc *= 2;
+            ls->log = realloc(ls->log, sizeof(int) * ls->log_alloc);
+        }
+        ls->log[ls->log_count++] = u;
     }
 
     ls->independent_set[u] = 0;
@@ -423,7 +424,7 @@ void local_search_perturbe(graph *g, local_search *ls)
 {
     int u = ls->pool[rand_r(&ls->seed) % ls->pool_size];
     int q = 0;
-    while (q++ < MAX_GUESS && ls->tabu[u])
+    while (q++ < MAX_GUESS && ls->tabu[u] && ls->independent_set[u])
         u = ls->pool[rand_r(&ls->seed) % ls->pool_size];
 
     if (ls->tabu[u])
@@ -447,7 +448,7 @@ void local_search_perturbe(graph *g, local_search *ls)
              i++)
         {
             int v = ls->queue[rand_r(&ls->seed) % ls->queue_count];
-            int q = 0;
+            q = 0;
             while (q++ < MAX_GUESS && ls->tabu[v])
                 v = ls->queue[rand_r(&ls->seed) % ls->queue_count];
 
@@ -464,11 +465,9 @@ void local_search_perturbe(graph *g, local_search *ls)
     }
 }
 
-void local_search_explore(graph *g, local_search *ls, double tl, int verbose)
+void local_search_explore(graph *g, local_search *ls, double tl, long long il, int verbose)
 {
-    int c = 0, q = 0;
-
-    long long best = ls->cost;
+    long long best = ls->cost, c = 0;
 
     if (verbose)
     {
@@ -495,13 +494,19 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose)
         }
     }
 
-    while (1)
+    while (c < il)
     {
-        if ((c++ & ((1 << 12) - 1)) == 0)
+        if ((c++ & ((1 << 7) - 1)) == 0)
         {
-            c = 0;
+            // c = 0;
             if (omp_get_wtime() - start > tl)
                 break;
+
+            if (verbose)
+            {
+                printf("\r%lld: %lld %.2lf    ", c, ls->cost, ls->time);
+                fflush(stdout);
+            }
         }
 
         ls->log_count = 0;
@@ -518,7 +523,7 @@ void local_search_explore(graph *g, local_search *ls, double tl, int verbose)
             ls->log_count = 0;
             if (verbose)
             {
-                printf("\r%lld %.2lf    ", ls->cost, ls->time);
+                printf("\r%lld: %lld %.2lf    ", c, ls->cost, ls->time);
                 fflush(stdout);
             }
         }

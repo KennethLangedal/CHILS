@@ -1,5 +1,6 @@
 #include "graph.h"
 
+#include <omp.h>
 #include <stdlib.h>
 #include <sys/mman.h>
 
@@ -78,7 +79,7 @@ void graph_free(graph *g)
 {
     if (g == NULL)
         return;
-        
+
     free(g->V);
     free(g->E);
     free(g->W);
@@ -121,17 +122,17 @@ int graph_validate(graph *g)
     return 1;
 }
 
-graph *graph_subgraph(graph *g, int *mask, int *reverse_mapping)
+graph *graph_subgraph(graph *g, int *mask, int *reverse_map)
 {
-    int *forward_mapping = malloc(sizeof(int) * g->N);
+    int *forward_map = malloc(sizeof(int) * g->N);
     int N = 0, M = 0;
     for (int u = 0; u < g->N; u++)
     {
         if (!mask[u])
             continue;
 
-        forward_mapping[u] = N;
-        reverse_mapping[N] = u;
+        forward_map[u] = N;
+        reverse_map[N] = u;
         N++;
 
         for (int i = g->V[u]; i < g->V[u + 1]; i++)
@@ -152,8 +153,8 @@ graph *graph_subgraph(graph *g, int *mask, int *reverse_mapping)
         if (!mask[u])
             continue;
 
-        sg->W[forward_mapping[u]] = g->W[u];
-        sg->V[forward_mapping[u]] = M;
+        sg->W[forward_map[u]] = g->W[u];
+        sg->V[forward_map[u]] = M;
 
         for (int i = g->V[u]; i < g->V[u + 1]; i++)
         {
@@ -161,13 +162,80 @@ graph *graph_subgraph(graph *g, int *mask, int *reverse_mapping)
             if (!mask[v])
                 continue;
 
-            sg->E[M] = forward_mapping[v];
+            sg->E[M] = forward_map[v];
             M++;
         }
     }
     sg->V[sg->N] = M;
 
-    free(forward_mapping);
+    free(forward_map);
 
     return sg;
+}
+
+void graph_subgraph_par(graph *g, graph *sg, int *mask, int *reverse_map, int *forward_map, int *s1, int *s2)
+{
+    int nt = omp_get_num_threads();
+    int tid = omp_get_thread_num();
+    int N = 0, M = 0;
+#pragma omp for nowait
+    for (int u = 0; u < g->N; u++)
+    {
+        if (!mask[u])
+            continue;
+
+        N++;
+
+        for (int i = g->V[u]; i < g->V[u + 1]; i++)
+            if (mask[g->E[i]])
+                M++;
+    }
+
+    s1[tid] = N;
+    s2[tid] = M;
+
+#pragma omp barrier
+
+    int No = 0, Mo = 0;
+    for (int i = 0; i < tid; i++)
+    {
+        No += s1[i];
+        Mo += s2[i];
+    }
+
+    N = 0;
+#pragma omp for
+    for (int u = 0; u < g->N; u++)
+    {
+        forward_map[u] = N + No;
+        reverse_map[N + No] = u;
+        N++;
+
+        sg->W[forward_map[u]] = g->W[u];
+        sg->V[forward_map[u]] = M + Mo;
+    }
+
+    if (tid == nt)
+    {
+        sg->N = No + N;
+        sg->V[sg->N] = M + Mo;
+    }
+
+    M = 0;
+#pragma omp for
+    for (int u = 0; u < g->N; u++)
+    {
+        if (!mask[u])
+            continue;
+
+        for (int i = g->V[u]; i < g->V[u + 1]; i++)
+        {
+            int v = g->E[i];
+            if (!mask[v])
+                continue;
+
+            sg->E[M] = forward_map[v];
+            M++;
+        }
+    }
 }
