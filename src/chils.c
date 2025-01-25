@@ -5,83 +5,126 @@
 #include "chils.h"
 
 #define MIN_CORE 512
+#define DEFAULT_STEP_TIME 5.0
+#define DEFAULT_STEP_COUNT LLONG_MAX
 
-chils *chils_init(graph *g, int N, unsigned int seed)
+chils *chils_init(graph *g, int p, unsigned int seed)
 {
-    chils *p = malloc(sizeof(chils));
+    chils *c = malloc(sizeof(chils));
 
-    p->N = N;
-    p->step = 5.0;
+    c->p = p;
+    c->step_time = DEFAULT_STEP_TIME;
+    c->step_count = DEFAULT_STEP_COUNT;
 
-    p->cost = 0;
-    p->time = 0.0;
+    c->cost = 0;
+    c->time = 0.0;
 
-    p->A = malloc(sizeof(int) * g->N);
-    for (int i = 0; i < g->N; i++)
-        p->A[i] = 0;
+    c->LS = malloc(sizeof(local_search *) * p);
+    c->LS_core = malloc(sizeof(local_search *) * p);
 
-    p->LS = malloc(sizeof(local_search *) * N);
+    c->d_core = malloc(sizeof(graph));
+    c->d_core->n = 0;
+    c->d_core->V = malloc(sizeof(int) * (g->n + 1));
+    c->d_core->V[0] = 0;
+    c->d_core->E = malloc(sizeof(int) * g->V[g->n]);
+    c->d_core->W = malloc(sizeof(long long) * g->n);
 
-#pragma omp parallel
+    c->FM = malloc(sizeof(int) * g->n);
+    c->RM = malloc(sizeof(int) * g->n);
+    c->A = malloc(sizeof(int) * g->n);
+    c->S1 = malloc(sizeof(int) * p);
+    c->S2 = malloc(sizeof(int) * p);
+
+#pragma omp parallel default(firstprivate)
     {
 #pragma omp for
-        for (int i = 0; i < N; i++)
-            p->LS[i] = local_search_init(g, seed + i);
+        for (int i = 0; i < p; i++)
+        {
+            c->LS[i] = local_search_init(g, seed + i);
+            c->LS_core[i] = local_search_init(g, seed + p + i);
+            c->S1[i] = 0;
+            c->S2[i] = 0;
+        }
+#pragma omp for
+        for (int i = 0; i < g->n; i++)
+        {
+            c->FM[i] = -1;
+            c->RM[i] = -1;
+            c->A[i] = 0;
+        }
     }
 
-    return p;
+    return c;
 }
 
-void chils_free(chils *p)
+void chils_free(chils *c)
 {
-    for (int i = 0; i < p->N; i++)
-        local_search_free(p->LS[i]);
-    free(p->LS);
-    free(p->A);
+    graph_free(c->d_core);
 
-    free(p);
+    for (int i = 0; i < c->p; i++)
+    {
+        local_search_free(c->LS[i]);
+        local_search_free(c->LS_core[i]);
+    }
+
+    free(c->LS);
+    free(c->LS_core);
+
+    free(c->FM);
+    free(c->RM);
+    free(c->A);
+    free(c->S1);
+    free(c->S2);
+
+    free(c);
 }
 
-void chils_print(chils *p, double elapsed, int Nr, int Mr)
-{
-    int best = 0, worst = 0;
-    for (int i = 1; i < p->N; i++)
-        if (p->LS[i]->cost > p->LS[best]->cost ||
-            (p->LS[i]->cost == p->LS[best]->cost && p->LS[i]->time < p->LS[best]->time))
-            best = i;
-        else if (p->LS[i]->cost < p->LS[worst]->cost)
-            worst = i;
-
-    printf("\r%lld (%d %.2lf) %lld (%d %.2lf) %.2lf %d %d         ",
-           p->LS[best]->cost, best, p->LS[best]->time,
-           p->LS[worst]->cost, worst, p->LS[worst]->time,
-           elapsed, Nr, Mr);
-    fflush(stdout);
-}
-
-int chils_find_last_best(chils *p)
+static inline int chils_find_overall_best(chils *c)
 {
     int best = 0;
-    for (int i = 1; i < p->N; i++)
-        if (p->LS[i]->cost >= p->LS[best]->cost)
+    for (int i = 1; i < c->p; i++)
+        if (c->LS[i]->cost > c->LS[best]->cost ||
+            (c->LS[i]->cost == c->LS[best]->cost && c->LS[i]->time < c->LS[best]->time))
             best = i;
     return best;
 }
 
-void chils_update_best(chils *p)
+static inline int chils_find_first_best(chils *c)
 {
-    for (int i = 0; i < p->N; i++)
-    {
-        if (p->LS[i]->cost > p->cost ||
-            (p->LS[i]->cost == p->cost && p->LS[i]->time < p->time))
-        {
-            p->cost = p->LS[i]->cost;
-            p->time = p->LS[i]->time;
-        }
-    }
+    int best = 0;
+    for (int i = 1; i < c->p; i++)
+        if (c->LS[i]->cost > c->LS[best]->cost) // || (c->LS[i]->cost == c->LS[best]->cost && c->LS[i]->time < c->LS[best]->time))
+            best = i;
+    return best;
 }
 
-void chils_run(graph *g, chils *p, double tl, long long cl, long long il, int verbose)
+static inline int chils_find_first_worst(chils *c)
+{
+    int worst = 0;
+    for (int i = 1; i < c->p; i++)
+        if (c->LS[i]->cost < c->LS[worst]->cost) // || (c->LS[i]->cost == c->LS[worst]->cost && c->LS[i]->time > c->LS[worst]->time))
+            worst = i;
+    return worst;
+}
+
+void chils_print(chils *c, long long it, double elapsed)
+{
+    int best = chils_find_overall_best(c), worst = chils_find_first_worst(c);
+    printf("\r%lld: %lld (%d %.2lf) %lld (%d %.2lf) %.2lf %d %d            ",
+           it, c->LS[best]->cost, best, c->LS[best]->time,
+           c->LS[worst]->cost, worst, c->LS[worst]->time,
+           elapsed, c->d_core->n, c->d_core->V[c->d_core->n]);
+    fflush(stdout);
+}
+
+void chils_update_best(chils *c)
+{
+    int best = chils_find_overall_best(c);
+    c->cost = c->LS[best]->cost;
+    c->time = c->LS[best]->time;
+}
+
+void chils_run(graph *g, chils *c, double tl, long long cl, int verbose)
 {
     double start = omp_get_wtime();
     double end = omp_get_wtime();
@@ -89,173 +132,145 @@ void chils_run(graph *g, chils *p, double tl, long long cl, long long il, int ve
 
     if (verbose)
     {
-        printf("Running chils for %.2lf seconds\n", tl);
-        chils_print(p, elapsed, g->N, g->V[g->N]);
+        printf("Running chils for %.2lf seconds or %lld iterations\n", tl, cl);
+        chils_print(c, 0, elapsed);
     }
 
-    graph *kernel = malloc(sizeof(graph));
-    kernel->N = 0;
-    kernel->V = malloc(sizeof(int) * (g->N + 1));
-    kernel->E = malloc(sizeof(int) * g->V[g->N]);
-    kernel->W = malloc(sizeof(long long) * g->N);
-    int *reverse_map = malloc(sizeof(int) * g->N);
-    int *forward_map = malloc(sizeof(int) * g->N);
-    int *A = malloc(sizeof(int) * g->N);
-    int *s1 = malloc(sizeof(int) * 512);
-    int *s2 = malloc(sizeof(int) * 512);
-    int Nr, Mr;
-
-#pragma omp parallel shared(elapsed, kernel, reverse_map, forward_map, s1, s2, A, Nr, Mr)
+#pragma omp parallel default(firstprivate) shared(elapsed)
     {
 #pragma omp for
-        for (int i = 0; i < p->N; i++)
+        for (int i = 0; i < c->p; i++)
         {
-            if (p->LS[i]->cost == 0 && i == 0)
-                local_search_in_order_solution(g, p->LS[i]);
-            else if (p->LS[i]->cost == 0)
-                local_search_add_vertex(g, p->LS[i], rand_r(&p->LS[i]->seed) % g->N);
+            if (c->LS[i]->cost == 0 && i == 0)
+                local_search_in_order_solution(g, c->LS[i]);
+            else if (c->LS[i]->cost == 0)
+                local_search_add_vertex(g, c->LS[i], rand_r(&c->LS[i]->seed) % g->n);
+
+            local_search_greedy(g, c->LS[i]);
         }
 
 #pragma omp single
         {
             end = omp_get_wtime();
             elapsed = end - start;
-
-            chils_update_best(p);
-
+            chils_update_best(c);
             if (verbose)
-                chils_print(p, elapsed, g->N, g->V[g->N]);
+                chils_print(c, 0, elapsed);
         }
 
-        int c = 0;
-        while (c++ < cl && elapsed < tl)
+        int ci = 0;
+        while (ci++ < cl && elapsed < tl)
         {
             /* Full graph LS */
 #pragma omp for
-            for (int i = 0; i < p->N; i++)
+            for (int i = 0; i < c->p; i++)
             {
                 double remaining_time = tl - (omp_get_wtime() - start);
-                double duration = p->step;
+                double duration = c->step_time;
                 if (remaining_time < duration)
                     duration = remaining_time;
                 if (duration > 0.0)
-                    local_search_explore(g, p->LS[i], duration, il, 0);
+                    local_search_explore(g, c->LS[i], duration, c->step_count, 0);
             }
 
-            /* Mark the CHILS core */
-#pragma omp for reduction(+ : Nr)
-            for (int i = 0; i < g->N; i++)
+            /* Mark the D-core */
+#pragma omp for nowait
+            for (int i = 0; i < g->n; i++)
             {
-                int c = 0;
-                for (int j = 0; j < p->N; j++)
-                    c += p->LS[j]->independent_set[i];
-                A[i] = c > 0 && c < p->N;
-                Nr += A[i];
+                int t = 0;
+                for (int j = 0; j < c->p; j++)
+                    t += c->LS[j]->independent_set[i];
+                c->A[i] = t > 0 && t < c->p;
             }
 
             /* Find the best solution */
-            int best = chils_find_last_best(p);
+            int best = chils_find_first_best(c);
 
-            /* Construct the CHILS core */
+            /* Construct the D-core */
 #pragma omp single
             {
-                chils_update_best(p);
+                chils_update_best(c);
                 if (verbose)
-                    chils_print(p, elapsed, g->N, g->V[g->N]);
-                // kernel = graph_subgraph(g, A, reverse_map);
+                    chils_print(c, ci, elapsed);
             }
-            graph_subgraph_par(g, kernel, A, reverse_map, forward_map, s1, s2);
 
-            /* CHILS core LS */
+            graph_subgraph_par(g, c->d_core, c->A, c->RM, c->FM, c->S1, c->S2);
+
+            /* D-core LS */
 #pragma omp for
-            for (int i = 0; i < p->N; i++)
+            for (int i = 0; i < c->p; i++)
             {
-                if (kernel->N == 0)
+                if (c->d_core->n == 0)
                     continue;
 
                 double remaining_time = tl - (omp_get_wtime() - start);
-                double duration = p->step * 0.5;
+                double duration = c->step_time * 0.5;
                 if (remaining_time < duration)
                     duration = remaining_time;
 
                 if (duration < 0.0)
                     continue;
 
-                local_search *ls_kernel = local_search_init(kernel, i);
-                ls_kernel->time_ref = p->LS[i]->time_ref;
+                local_search_reset(c->d_core, c->LS_core[i]);
+                c->LS_core[i]->time_ref = c->LS[i]->time_ref;
 
                 long long ref = 0;
-                for (int u = 0; u < kernel->N; u++)
-                    if (p->LS[i]->independent_set[reverse_map[u]])
-                        ref += kernel->W[u];
+                for (int u = 0; u < c->d_core->n; u++)
+                    if (c->LS[i]->independent_set[c->RM[u]])
+                        ref += c->d_core->W[u];
 
-                local_search_explore(kernel, ls_kernel, duration, il, 0);
+                local_search_explore(c->d_core, c->LS_core[i], duration, c->step_count, 0);
 
-                if (ref <= ls_kernel->cost || (i != best && (i % 2) == 0))
-                    for (int u = 0; u < kernel->N; u++)
-                        if (ls_kernel->independent_set[u] && !p->LS[i]->independent_set[reverse_map[u]])
-                            local_search_add_vertex(g, p->LS[i], reverse_map[u]);
+                if (ref <= c->LS_core[i]->cost || (i != best && (i % 2) == 0))
+                    for (int u = 0; u < c->d_core->n; u++)
+                        if (c->LS_core[i]->independent_set[u] && !c->LS[i]->independent_set[c->RM[u]])
+                            local_search_add_vertex(g, c->LS[i], c->RM[u]);
 
-                if (ref < ls_kernel->cost)
-                    p->LS[i]->time = ls_kernel->time;
-
-                local_search_free(ls_kernel);
+                if (ref < c->LS_core[i]->cost)
+                    c->LS[i]->time = c->LS_core[i]->time;
             }
 
             /* Find the best solution after LS on the CHILS core */
-            best = chils_find_last_best(p);
+            best = chils_find_first_best(c);
 
-#pragma omp single
-            {
-                Mr = kernel->V[kernel->N];
-                chils_update_best(p);
-                // graph_free(kernel);
-            }
-
+#pragma omp barrier
 #pragma omp for
-            for (int i = 0; i < p->N; i++)
+            for (int i = 0; i < c->p; i++)
             {
-                if (Nr < MIN_CORE && i != best && (i % 2) == 0)
-                    local_search_perturbe(g, p->LS[i]);
+                if (c->d_core->n < MIN_CORE && i != best && (i % 2) == 0)
+                    local_search_perturbe(g, c->LS[i]);
             }
 
 #pragma omp single
             {
                 end = omp_get_wtime();
                 elapsed = end - start;
+                chils_update_best(c);
                 if (verbose)
-                    chils_print(p, elapsed, Nr, Mr);
-                Nr = 0;
+                    chils_print(c, ci, elapsed);
             }
         }
     }
 
     if (verbose)
         printf("\n");
-
-    graph_free(kernel);
-    free(reverse_map);
-    free(forward_map);
-    free(A);
-    free(s1);
-    free(s2);
 }
 
-void chils_set_solution(graph *g, chils *p, const int *independent_set)
+void chils_set_solution(graph *g, chils *c, const int *I)
 {
 #pragma omp for
-    for (int i = 0; i < p->N; i++)
-        for (int j = 0; j < g->N; j++)
-            if (independent_set[j])
-                local_search_add_vertex(g, p->LS[i], j);
+    for (int i = 0; i < c->p; i++)
+        for (int j = 0; j < g->n; j++)
+            if (I[j])
+                local_search_add_vertex(g, c->LS[i], j);
 }
 
-int *chils_get_best_independent_set(chils *p)
+int *chils_get_best_independent_set(chils *c)
 {
     int best = 0;
-    for (int i = 0; i < p->N; i++)
-        if (p->LS[i]->cost > p->LS[best]->cost)
+    for (int i = 1; i < c->p; i++)
+        if (c->LS[i]->cost > c->LS[best]->cost)
             best = i;
 
-    return p->LS[best]->independent_set;
+    return c->LS[best]->independent_set;
 }

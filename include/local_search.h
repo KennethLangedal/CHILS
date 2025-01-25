@@ -30,6 +30,8 @@ local_search *local_search_init(graph *g, unsigned int seed);
 
 void local_search_free(local_search *ls);
 
+void local_search_reset(graph *g, local_search *ls);
+
 void local_search_in_order_solution(graph *g, local_search *ls);
 
 void local_search_add_vertex(graph *g, local_search *ls, int u);

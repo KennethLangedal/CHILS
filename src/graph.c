@@ -4,14 +4,14 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 
-static inline void parse_id(char *data, size_t *p, long long *v)
+static inline void parse_id(char *Data, size_t *p, long long *v)
 {
-    while (data[*p] < '0' || data[*p] > '9')
+    while (Data[*p] < '0' || Data[*p] > '9')
         (*p)++;
 
     *v = 0;
-    while (data[*p] >= '0' && data[*p] <= '9')
-        *v = (*v) * 10 + data[(*p)++] - '0';
+    while (Data[*p] >= '0' && Data[*p] <= '9')
+        *v = (*v) * 10 + Data[(*p)++] - '0';
 }
 
 graph *graph_parse(FILE *f)
@@ -20,44 +20,44 @@ graph *graph_parse(FILE *f)
     size_t size = ftell(f);
     fseek(f, 0, SEEK_SET);
 
-    char *data = mmap(0, size, PROT_READ, MAP_PRIVATE, fileno_unlocked(f), 0);
+    char *Data = mmap(0, size, PROT_READ, MAP_PRIVATE, fileno_unlocked(f), 0);
     size_t p = 0;
 
-    long long N, M, t;
-    parse_id(data, &p, &N);
-    parse_id(data, &p, &M);
-    parse_id(data, &p, &t);
+    long long n, m, t;
+    parse_id(Data, &p, &n);
+    parse_id(Data, &p, &m);
+    parse_id(Data, &p, &t);
 
-    int *V = malloc(sizeof(int) * (N + 1));
-    int *E = malloc(sizeof(int) * (M * 2));
+    int *V = malloc(sizeof(int) * (n + 1));
+    int *E = malloc(sizeof(int) * (m * 2));
 
-    long long *W = malloc(sizeof(long long) * N);
+    long long *W = malloc(sizeof(long long) * n);
 
     int ei = 0;
-    for (int u = 0; u < N; u++)
+    for (int u = 0; u < n; u++)
     {
-        parse_id(data, &p, W + u);
+        parse_id(Data, &p, W + u);
         V[u] = ei;
-        while (ei < M * 2)
+        while (ei < m * 2)
         {
-            while (data[p] == ' ')
+            while (Data[p] == ' ')
                 p++;
-            if (data[p] == '\n')
+            if (Data[p] == '\n')
                 break;
 
             long long e;
-            parse_id(data, &p, &e);
+            parse_id(Data, &p, &e);
             E[ei++] = e - 1;
             ;
         }
         p++;
     }
-    V[N] = ei;
+    V[n] = ei;
 
-    munmap(data, size);
+    munmap(Data, size);
 
     graph *g = malloc(sizeof(graph));
-    *g = (graph){.N = N, .V = V, .E = E, .W = W};
+    *g = (graph){.n = n, .V = V, .E = E, .W = W};
 
     return g;
 }
@@ -65,8 +65,8 @@ graph *graph_parse(FILE *f)
 // store graph in metis format
 void graph_store(FILE *f, graph *g)
 {
-    fprintf(f, "%d %d 10\n", g->N, g->V[g->N] / 2);
-    for (int u = 0; u < g->N; u++)
+    fprintf(f, "%d %d 10\n", g->n, g->V[g->n] / 2);
+    for (int u = 0; u < g->n; u++)
     {
         fprintf(f, "%lld", g->W[u]);
         for (int i = g->V[u]; i < g->V[u + 1]; i++)
@@ -95,7 +95,7 @@ static inline int compare(const void *a, const void *b)
 int graph_validate(graph *g)
 {
     int M = 0;
-    for (int u = 0; u < g->N; u++)
+    for (int u = 0; u < g->n; u++)
     {
         if (g->V[u + 1] - g->V[u] < 0)
             return 0;
@@ -104,11 +104,11 @@ int graph_validate(graph *g)
 
         for (int i = g->V[u]; i < g->V[u + 1]; i++)
         {
-            if (i < 0 || i >= g->V[g->N])
+            if (i < 0 || i >= g->V[g->n])
                 return 0;
 
             int v = g->E[i];
-            if (v < 0 || v >= g->N || v == u || (i > g->V[u] && v <= g->E[i - 1]))
+            if (v < 0 || v >= g->n || v == u || (i > g->V[u] && v <= g->E[i - 1]))
                 return 0;
 
             // if (bsearch(&u, g->E + g->V[v], g->V[v + 1] - g->V[v], sizeof(int), compare) == NULL)
@@ -116,131 +116,130 @@ int graph_validate(graph *g)
         }
     }
 
-    if (M != g->V[g->N])
+    if (M != g->V[g->n])
         return 0;
 
     return 1;
 }
 
-graph *graph_subgraph(graph *g, int *mask, int *reverse_map)
+graph *graph_subgraph(graph *g, int *Mask, int *RM)
 {
-    int *forward_map = malloc(sizeof(int) * g->N);
-    int N = 0, M = 0;
-    for (int u = 0; u < g->N; u++)
+    int *FM = malloc(sizeof(int) * g->n);
+    int n = 0, m = 0;
+    for (int u = 0; u < g->n; u++)
     {
-        if (!mask[u])
+        if (!Mask[u])
             continue;
 
-        forward_map[u] = N;
-        reverse_map[N] = u;
-        N++;
+        FM[u] = n;
+        RM[n] = u;
+        n++;
 
         for (int i = g->V[u]; i < g->V[u + 1]; i++)
-            if (mask[g->E[i]])
-                M++;
+            if (Mask[g->E[i]])
+                m++;
     }
 
     graph *sg = malloc(sizeof(graph));
-    *sg = (graph){.N = N};
+    *sg = (graph){.n = n};
 
-    sg->V = malloc(sizeof(int) * (N + 1));
-    sg->E = malloc(sizeof(int) * M);
-    sg->W = malloc(sizeof(long long) * N);
+    sg->V = malloc(sizeof(int) * (n + 1));
+    sg->E = malloc(sizeof(int) * m);
+    sg->W = malloc(sizeof(long long) * n);
 
-    M = 0;
-    for (int u = 0; u < g->N; u++)
+    m = 0;
+    for (int u = 0; u < g->n; u++)
     {
-        if (!mask[u])
+        if (!Mask[u])
             continue;
 
-        sg->W[forward_map[u]] = g->W[u];
-        sg->V[forward_map[u]] = M;
+        sg->W[FM[u]] = g->W[u];
+        sg->V[FM[u]] = m;
 
         for (int i = g->V[u]; i < g->V[u + 1]; i++)
         {
             int v = g->E[i];
-            if (!mask[v])
+            if (!Mask[v])
                 continue;
 
-            sg->E[M] = forward_map[v];
-            M++;
+            sg->E[m] = FM[v];
+            m++;
         }
     }
-    sg->V[sg->N] = M;
+    sg->V[sg->n] = m;
 
-    free(forward_map);
+    free(FM);
 
     return sg;
 }
 
-void graph_subgraph_par(graph *g, graph *sg, int *mask, int *reverse_map, int *forward_map, int *s1, int *s2)
+void graph_subgraph_par(graph *g, graph *sg, int *Mask, int *RM, int *FM, int *S1, int *S2)
 {
     int nt = omp_get_num_threads();
     int tid = omp_get_thread_num();
-    int N = 0, M = 0;
+    int n = 0, m = 0;
 #pragma omp for nowait
-    for (int u = 0; u < g->N; u++)
+    for (int u = 0; u < g->n; u++)
     {
-        if (!mask[u])
+        if (!Mask[u])
             continue;
 
-        N++;
+        n++;
 
         for (int i = g->V[u]; i < g->V[u + 1]; i++)
-            if (mask[g->E[i]])
-                M++;
+            if (Mask[g->E[i]])
+                m++;
     }
 
-    s1[tid] = N;
-    s2[tid] = M;
+    S1[tid] = n;
+    S2[tid] = m;
 
 #pragma omp barrier
 
-    int No = 0, Mo = 0;
+    int n_o = 0, m_o = 0;
     for (int i = 0; i < tid; i++)
     {
-        No += s1[i];
-        Mo += s2[i];
+        n_o += S1[i];
+        m_o += S2[i];
     }
 
-    N = No;
+    n = n_o;
 #pragma omp for
-    for (int u = 0; u < g->N; u++)
+    for (int u = 0; u < g->n; u++)
     {
-        if (!mask[u])
+        if (!Mask[u])
             continue;
 
-        forward_map[u] = N;
-        reverse_map[N] = u;
-        N++;
-
-        sg->W[forward_map[u]] = g->W[u];
+        FM[u] = n;
+        RM[n] = u;
+        sg->W[n] = g->W[u];
+        n++;
     }
 
-    M = Mo;
+    m = m_o;
 #pragma omp for nowait
-    for (int u = 0; u < g->N; u++)
+    for (int u = 0; u < g->n; u++)
     {
-        if (!mask[u])
+        if (!Mask[u])
             continue;
 
-        sg->V[forward_map[u]] = M;
+        sg->V[FM[u]] = m;
 
         for (int i = g->V[u]; i < g->V[u + 1]; i++)
         {
             int v = g->E[i];
-            if (!mask[v])
+            if (!Mask[v])
                 continue;
 
-            sg->E[M] = forward_map[v];
-            M++;
+            sg->E[m] = FM[v];
+            m++;
         }
     }
 
     if (tid == nt - 1)
     {
-        sg->N = N;
-        sg->V[sg->N] = M;
+        sg->n = n;
+        sg->V[sg->n] = m;
     }
 #pragma omp barrier
 }

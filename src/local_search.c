@@ -14,48 +14,27 @@ local_search *local_search_init(graph *g, unsigned int seed)
 {
     local_search *ls = malloc(sizeof(local_search));
 
-    ls->cost = 0;
-    ls->time = 0.0;
-    ls->time_ref = omp_get_wtime();
-    ls->independent_set = malloc(sizeof(int) * g->N);
+    ls->independent_set = malloc(sizeof(int) * g->n);
 
-    ls->queue_count = g->N;
-    ls->queue = malloc(sizeof(int) * g->N);
-    ls->in_queue = malloc(sizeof(int) * g->N);
-    ls->prev_queue = malloc(sizeof(int) * g->N);
-    ls->in_prev_queue = malloc(sizeof(int) * g->N);
+    ls->queue = malloc(sizeof(int) * g->n);
+    ls->in_queue = malloc(sizeof(int) * g->n);
+    ls->prev_queue = malloc(sizeof(int) * g->n);
+    ls->in_prev_queue = malloc(sizeof(int) * g->n);
 
-    ls->pool_size = g->N;
     ls->max_queue = DEFAULT_QUEUE_SIZE;
-    ls->adjacent_weight = malloc(sizeof(long long) * g->N);
-    ls->tabu = malloc(sizeof(int) * g->N);
-    ls->tightness = malloc(sizeof(int) * g->N);
-    ls->temp = malloc(sizeof(int) * g->N * 2);
-    ls->mask = malloc(sizeof(int) * g->N);
-    ls->pool = malloc(sizeof(int) * g->N);
+    ls->adjacent_weight = malloc(sizeof(long long) * g->n);
+    ls->tabu = malloc(sizeof(int) * g->n);
+    ls->tightness = malloc(sizeof(int) * g->n);
+    ls->temp = malloc(sizeof(int) * g->n * 2);
+    ls->mask = malloc(sizeof(int) * g->n);
+    ls->pool = malloc(sizeof(int) * g->n);
 
-    ls->log_count = 0;
-    ls->log_alloc = g->N;
-    ls->log_enabled = 0;
+    ls->log_alloc = g->n;
     ls->log = malloc(sizeof(int) * ls->log_alloc);
 
     ls->seed = seed;
 
-    for (int u = 0; u < g->N; u++)
-    {
-        ls->independent_set[u] = 0;
-        ls->queue[u] = u;
-        ls->in_queue[u] = 1;
-        ls->prev_queue[u] = 0;
-        ls->in_prev_queue[u] = 0;
-
-        ls->adjacent_weight[u] = 0;
-        ls->tabu[u] = 0;
-        ls->tightness[u] = 0;
-        ls->temp[u] = 0;
-        ls->mask[u] = 0;
-        ls->pool[u] = u;
-    }
+    local_search_reset(g, ls);
 
     return ls;
 }
@@ -81,6 +60,35 @@ void local_search_free(local_search *ls)
     free(ls);
 }
 
+void local_search_reset(graph *g, local_search *ls)
+{
+    ls->cost = 0;
+    ls->time = 0.0;
+    ls->time_ref = omp_get_wtime();
+
+    ls->queue_count = g->n;
+    ls->pool_size = g->n;
+
+    ls->log_count = 0;
+    ls->log_enabled = 0;
+
+    for (int u = 0; u < g->n; u++)
+    {
+        ls->independent_set[u] = 0;
+        ls->queue[u] = u;
+        ls->in_queue[u] = 1;
+        ls->prev_queue[u] = 0;
+        ls->in_prev_queue[u] = 0;
+
+        ls->adjacent_weight[u] = 0;
+        ls->tabu[u] = 0;
+        ls->tightness[u] = 0;
+        ls->temp[u] = 0;
+        ls->mask[u] = 0;
+        ls->pool[u] = u;
+    }
+}
+
 static inline void local_search_shuffle(int *list, int n, unsigned int *seed)
 {
     for (int i = 0; i < n - 1; i++)
@@ -94,7 +102,7 @@ static inline void local_search_shuffle(int *list, int n, unsigned int *seed)
 
 void local_search_in_order_solution(graph *g, local_search *ls)
 {
-    for (int u = 0; u < g->N; u++)
+    for (int u = 0; u < g->n; u++)
     {
         if (!ls->tabu[u] && ls->adjacent_weight[u] < g->W[u])
             local_search_add_vertex(g, ls, u);
@@ -352,7 +360,7 @@ void local_search_aap(graph *g, local_search *ls, int u, int imp)
         else if (!ls->independent_set[v])
         {
             diff += g->W[v];
-            ls->temp[g->N + to_add++] = v;
+            ls->temp[g->n + to_add++] = v;
         }
 
         if (ls->independent_set[v] && diff > best)
@@ -369,7 +377,7 @@ void local_search_aap(graph *g, local_search *ls, int u, int imp)
     {
         for (int i = 0; i < best_position; i++)
         {
-            int v = ls->temp[g->N + i];
+            int v = ls->temp[g->n + i];
             local_search_add_vertex(g, ls, v);
         }
     }
@@ -409,7 +417,7 @@ void local_search_greedy(graph *g, local_search *ls)
             else if (ls->independent_set[u] && g->V[u + 1] - g->V[u] < MAX_TWO_ONE_DEGREE)
                 local_search_two_one(g, ls, u);
 
-            if (ls->tightness[u] == 1 && g->V[g->N] < AAP_LIMIT)
+            if (ls->tightness[u] == 1 && g->V[g->n] < AAP_LIMIT)
                 local_search_aap(g, ls, u, 1);
         }
 

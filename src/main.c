@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <stdint.h>
+#include <limits.h>
 #include <time.h>
 #include <omp.h>
 
@@ -12,7 +12,7 @@
 long long mwis_validate(graph *g, int *independent_set)
 {
     long long cost = 0;
-    for (int u = 0; u < g->N; u++)
+    for (int u = 0; u < g->n; u++)
     {
         if (!independent_set[u])
             continue;
@@ -29,10 +29,13 @@ long long mwis_validate(graph *g, int *independent_set)
 }
 
 const char *help = "CHILS --- Concurrent Hybrid Iterated Local Search\n"
-                   "\nThe output of the program without -v is a single line on the form:\n"
-                   "instance_name,#vertices,#edges,W_after_10%,W_after_50%,W_after_t,Best_t\n"
+                   "\nThe output of the program without -v or -b is a single line on the form:\n"
+                   "instance_name,#vertices,#edges,is_weight,solution_time,total_time\n"
+                   "\nThe output with -b also includes best solution after 10\%, 50\%, and 100\% of the max time/iterations\n"
+                   "instance_name,#vertices,#edges,is_weight_after_10\%,is_weight_after_50\%,is_weight_after_100\%,solution_time,total_time\n"
                    "\n-h \t\tDisplay this help message\n"
                    "-v \t\tVerbose mode, output continous updates to STDOUT\n"
+                   "-b \t\tBlocked mode, output additional results after 10\%, 50\%, and 100\% of the  max time/iterations\n"
                    "-g path* \tPath to the input graph in METIS format\n"
                    "-i path \tPath to initial solution (1-indexed list)\n"
                    "-o path \tPath to store the best solution found \t\t default not stored\n"
@@ -52,16 +55,16 @@ int main(int argc, char **argv)
     char *graph_path = NULL,
          *initial_solution_path = NULL,
          *solution_path = NULL;
-    int verbose = 0, run_chils = 1, max_queue = 32, num_threads = -1;
+    int verbose = 0, blocked = 0, run_chils = 1, max_queue = 32, num_threads = -1;
     double timeout = 3600, step = 5, reduction_timout = 30;
 
-    long long cl = INT64_MAX, il = INT64_MAX;
+    long long cl = LLONG_MAX, il = LLONG_MAX;
 
     unsigned int seed = time(NULL);
 
     int command;
 
-    while ((command = getopt(argc, argv, "hvg:i:o:p:t:n:s:m:q:c:r:")) != -1)
+    while ((command = getopt(argc, argv, "hvbg:i:o:p:t:n:s:m:q:c:r:")) != -1)
     {
         switch (command)
         {
@@ -70,6 +73,9 @@ int main(int argc, char **argv)
             return 0;
         case 'v':
             verbose = 1;
+            break;
+        case 'b':
+            blocked = 1;
             break;
         case 'g':
             graph_path = optarg;
@@ -145,8 +151,8 @@ int main(int argc, char **argv)
             return 1;
         }
 
-        initial_solution = malloc(sizeof(int) * g->N);
-        for (int i = 0; i < g->N; i++)
+        initial_solution = malloc(sizeof(int) * g->n);
+        for (int i = 0; i < g->n; i++)
             initial_solution[i] = 0;
 
         int u = 0;
@@ -178,81 +184,130 @@ int main(int argc, char **argv)
         else
             printf("Running CHILS using %d concurrent solutions\n", run_chils);
 
+        if (blocked)
+            printf("Blocked mode\n");
+
         printf("Input: \t\t\t%s\n", graph_path + path_offset);
-        printf("Vertices: \t\t%d\n", g->N);
-        printf("Edges: \t\t\t%d\n", g->V[g->N] / 2);
+        printf("Vertices: \t\t%d\n", g->n);
+        printf("Edges: \t\t\t%d\n", g->V[g->n] / 2);
+        printf("Seed: \t\t\t%u\n", seed);
         if (solution_path != NULL)
             printf("Output: \t\t%s\n", solution_path);
-        printf("Tiomeout: \t\t%.2lf seconds\n", timeout);
+        if (cl < LLONG_MAX)
+            printf("Tiomeout: \t\t%.2lf seconds or %lld CHILS iterations\n", timeout, cl);
+        else
+            printf("Tiomeout: \t\t%.2lf seconds\n", timeout);
         printf("Max queue size: \t%d\n", max_queue);
         if (run_chils > 1)
-            printf("CHILS interval: \t%.2lf seconds\n", step);
+        {
+            if (il < LLONG_MAX)
+                printf("CHILS interval: \t%.2lf seconds or %lld iterations\n", step, il);
+            else
+                printf("CHILS interval: \t%.2lf seconds\n", step);
+        }
         if (initial_solution_path != NULL)
             printf("Initial solution: \t%lld\n", initial_solution_weight);
     }
 
     long long w10, w50, w100;
-    double t10 = timeout * 0.1, t50 = timeout * 0.4, t100 = timeout * 0.5, tb = 0.0;
+    double t10 = timeout * 0.1, t50 = timeout * 0.4, t100 = timeout * 0.5, tb = 0.0, t_total = 0.0;
     long long c10 = cl / 10ll, c50 = (cl / 10ll) * 4, c100 = (cl / 10ll) * 5;
 
-    int *solution = malloc(sizeof(int) * g->N);
+    int *solution = malloc(sizeof(int) * g->n);
+    for (int i = 0; i < g->n; i++)
+        solution[i] = 0;
 
     if (run_chils > 1)
     {
         if (num_threads > 0)
             omp_set_num_threads(num_threads);
 
-        chils *p = chils_init(g, run_chils, seed);
-        p->step = step;
+        chils *c = chils_init(g, run_chils, seed);
+        c->step_time = step;
+        c->step_count = il;
 
         if (initial_solution != NULL)
-            chils_set_solution(g, p, initial_solution);
+            chils_set_solution(g, c, initial_solution);
 
         for (int i = 0; i < run_chils; i++)
-            p->LS[i]->max_queue = max_queue + (4 * i);
+        {
+            c->LS[i]->max_queue = max_queue + (4 * i);
+            c->LS_core[i]->max_queue = max_queue + (4 * i);
+        }
 
-        chils_run(g, p, t10, c10, il, verbose);
-        w10 = mwis_validate(g, chils_get_best_independent_set(p));
-        chils_run(g, p, t50, c50, il, verbose);
-        w50 = mwis_validate(g, chils_get_best_independent_set(p));
-        chils_run(g, p, t100, c100, il, verbose);
-        w100 = mwis_validate(g, chils_get_best_independent_set(p));
+        double start = omp_get_wtime();
 
-        tb = p->time;
+        if (blocked)
+        {
+            chils_run(g, c, t10, c10, verbose);
+            w10 = mwis_validate(g, chils_get_best_independent_set(c));
+            chils_run(g, c, t50, c50, verbose);
+            w50 = mwis_validate(g, chils_get_best_independent_set(c));
+            chils_run(g, c, t100, c100, verbose);
+            w100 = mwis_validate(g, chils_get_best_independent_set(c));
+        }
+        else
+        {
+            chils_run(g, c, timeout, cl, verbose);
+            w100 = mwis_validate(g, chils_get_best_independent_set(c));
+        }
 
-        int *best = chils_get_best_independent_set(p);
-        for (int i = 0; i < g->N; i++)
+        double end = omp_get_wtime();
+        t_total = end - start;
+
+        tb = c->time;
+
+        int *best = chils_get_best_independent_set(c);
+        for (int i = 0; i < g->n; i++)
             solution[i] = best[i];
 
-        chils_free(p);
+        chils_free(c);
     }
     else
     {
-        local_search *ls = local_search_init(g, 0);
+        local_search *ls = local_search_init(g, seed);
 
         if (initial_solution != NULL)
-            for (int u = 0; u < g->N; u++)
+            for (int u = 0; u < g->n; u++)
                 if (initial_solution[u])
                     local_search_add_vertex(g, ls, u);
 
         ls->max_queue = max_queue;
-        local_search_explore(g, ls, t10, il, verbose);
-        w10 = mwis_validate(g, ls->independent_set);
-        local_search_explore(g, ls, t50, il, verbose);
-        w50 = mwis_validate(g, ls->independent_set);
-        local_search_explore(g, ls, t100, il, verbose);
-        w100 = mwis_validate(g, ls->independent_set);
+
+        double start = omp_get_wtime();
+
+        if (blocked)
+        {
+            local_search_explore(g, ls, t10, il, verbose);
+            w10 = mwis_validate(g, ls->independent_set);
+            local_search_explore(g, ls, t50, il, verbose);
+            w50 = mwis_validate(g, ls->independent_set);
+            local_search_explore(g, ls, t100, il, verbose);
+            w100 = mwis_validate(g, ls->independent_set);
+        }
+        else
+        {
+            local_search_explore(g, ls, timeout, il, verbose);
+            w100 = mwis_validate(g, ls->independent_set);
+        }
+
+        double end = omp_get_wtime();
+        t_total = end - start;
 
         tb = ls->time;
 
-        for (int i = 0; i < g->N; i++)
+        for (int i = 0; i < g->n; i++)
             solution[i] = ls->independent_set[i];
 
         local_search_free(ls);
     }
 
-    printf("%s,%d,%d,%lld,%lld,%lld,%.4lf\n", graph_path + path_offset,
-           g->N, g->V[g->N] / 2, w10, w50, w100, tb);
+    if (blocked)
+        printf("%s,%d,%d,%lld,%lld,%lld,%.4lf,%.4lf\n", graph_path + path_offset,
+               g->n, g->V[g->n] / 2, w10, w50, w100, tb, t_total);
+    else
+        printf("%s,%d,%d,%lld,%.4lf,%.4lf\n", graph_path + path_offset,
+               g->n, g->V[g->n] / 2, w100, tb, t_total);
 
     if (solution_path != NULL)
     {
@@ -266,7 +321,7 @@ int main(int argc, char **argv)
             if (verbose)
                 printf("\nStoring solution of size %lld to %s\n", w100, solution_path);
 
-            for (int i = 0; i < g->N; i++)
+            for (int i = 0; i < g->n; i++)
                 if (solution[i])
                     fprintf(f, "%d\n", i + 1);
 
