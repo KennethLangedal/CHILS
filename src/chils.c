@@ -35,7 +35,7 @@ chils *chils_init(graph *g, int p, unsigned int seed)
     c->S1 = malloc(sizeof(int) * p);
     c->S2 = malloc(sizeof(int) * p);
 
-#pragma omp parallel default(firstprivate)
+#pragma omp parallel
     {
 #pragma omp for
         for (int i = 0; i < p; i++)
@@ -136,7 +136,7 @@ void chils_run(graph *g, chils *c, double tl, long long cl, int verbose)
         chils_print(c, 0, elapsed);
     }
 
-#pragma omp parallel default(firstprivate) shared(elapsed)
+#pragma omp parallel
     {
 #pragma omp for
         for (int i = 0; i < c->p; i++)
