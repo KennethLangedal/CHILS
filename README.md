@@ -37,10 +37,6 @@ The output of the program without the **-v** option is a single line on the form
 ```
 instance_name,#vertices,#edges,WIS,time
 ```
-Using the **-b** option gives additional information about solution size after 10%, 50%, and 100% of the time/iterations. The single output line then looks like
-```
-instance_name,#vertices,#edges,WIS_after_10%,WIS_after_50%,WIS_after_100%,time
-```
 For example, after running
 ```
 ./CHILS -g CR-T-D-4.graph
@@ -49,13 +45,11 @@ The output could look something like this
 ```
 CR-T-D-4,651861,220480534,4922752,3557.2678
 ```
-And with **-b**
-```
-CR-T-D-4,651861,220480534,4900379,4919890,4922752,3557.2678
-```
-Where 4900379 is the solution size after 10 minutes, 4919890 after 30, and 4922752 after 1 hour. 3557.2678 is the time when the best solution was found.
+Where 4922752 is the solution size after 1 hour. 3557.2678 is the time when the best solution was found.
 
-Examples of typical use cases are listed below, naturally, change **-t**, **-q**, and **-s** as necessary.
+## How to Use
+
+Examples of typical use cases are listed below. Naturally, change **-t** (time limit), **-q** (max queue size), and **-s** (alternating CHILS interval) as necessary.
 
 ### Baseline Local Search
 
@@ -101,9 +95,29 @@ Notice that vertices are 1-indexed, and edges appear in the neighborhoods of bot
 
 ## Output Format
 
-The output format also used as input format for the **-i** option, is simply a list of 1-indexed vertices, one vertex per line. For example, the solution to the graph used above would look like this
+The output format, also used as input format for the **-i** option, is simply a list of 1-indexed vertices, one vertex per line. For example, the solution to the graph used above would look like this
 
 ```
 1
 2
 ```
+
+## Reproducing Results from the Paper
+
+Using the **-b** option gives additional information about solution size after 10%, 50%, and 100% of the time/iterations. The single output line then looks like
+```
+instance_name,#vertices,#edges,WIS_after_10%,WIS_after_50%,WIS_after_100%,time
+```
+For example, after running
+```
+./CHILS -g CR-T-D-4.graph -b
+```
+The output could look something like this
+```
+CR-T-D-4,651861,220480534,4900379,4919890,4922752,3557.2678
+```
+Where 4900379 is the solution size after 10 minutes, 4919890 after 30, and 4922752 after 1 hour. 3557.2678 is the time when the best solution was found.
+
+# Parallel Experiments
+
+The options **-n** and **-m** are used to set an exact number of CHILS/local search iterations. Together with **-r** to set a specific random seed, the execution can be made deterministic for parallel scalability experiments.
