@@ -47,7 +47,7 @@ const char *help = "CHILS --- Concurrent Hybrid Iterated Local Search\n"
                    "-r s \t\tSet a specific random seed \t\t\t default time(NULL)\n"
                    "\n"
                    "-n it \t\tMax CHILS iterations \t\t\t\t default inf\n"
-                   "-m it \t\tAlternating iteration limit for CHILS \t\t default inf\n"
+                   "-m it \t\tMax local search iterations \t\t\t default inf\n"
                    "\n* Mandatory input";
 
 int main(int argc, char **argv)

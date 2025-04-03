@@ -17,7 +17,7 @@ all : CHILS
 -include $(DEP:.o=.d)
 
 CHILS : $(OBJ_CHILS)
-	$(CC) $(CFLAGS) -o $@ $^ -lm
+	$(CC) $(CFLAGS) -o $@ $^
 
 bin/%.o : %.c
 	$(CC) $(CFLAGS) -MMD -c $< -o $@
