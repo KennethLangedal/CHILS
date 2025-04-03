@@ -6,7 +6,7 @@
 #include <omp.h>
 
 #define MAX_GUESS 128
-#define MAX_TWO_ONE_DEGREE (1 << 11)
+#define MAX_TWO_ONE_DEGREE (1 << 8)
 #define AAP_LIMIT (1 << 19)
 #define DEFAULT_QUEUE_SIZE 32
 
@@ -483,7 +483,8 @@ void local_search_explore(graph *g, local_search *ls, double tl, long long il, i
             printf("Running local search for %.2lf seconds or %lld iterations\n", tl, il);
         else
             printf("Running local search for %.2lf seconds\n", tl);
-        printf("\r%10lld: %12lld %.2lf", 0ll, ls->cost, 0.0);
+        printf("%11s %12s %8s\n", "It.", "WIS", "Time");
+        printf("\r%10lld: %12lld %8.2lf", 0ll, ls->cost, 0.0);
         fflush(stdout);
     }
 
@@ -500,7 +501,7 @@ void local_search_explore(graph *g, local_search *ls, double tl, long long il, i
         ls->time = omp_get_wtime() - ls->time_ref;
         if (verbose)
         {
-            printf("\r%10lld: %12lld %.2lf", 0ll, ls->cost, ls->time);
+            printf("\r%10lld: %12lld %8.2lf", 0ll, ls->cost, ls->time);
             fflush(stdout);
         }
     }
@@ -515,7 +516,7 @@ void local_search_explore(graph *g, local_search *ls, double tl, long long il, i
 
             if (verbose)
             {
-                printf("\r%10lld: %12lld %.2lf", c, ls->cost, ls->time);
+                printf("\r%10lld: %12lld %8.2lf", c, ls->cost, ls->time);
                 fflush(stdout);
             }
         }
@@ -534,7 +535,7 @@ void local_search_explore(graph *g, local_search *ls, double tl, long long il, i
             ls->log_count = 0;
             if (verbose)
             {
-                printf("\r%10lld: %12lld %.2lf", c, ls->cost, ls->time);
+                printf("\r%10lld: %12lld %8.2lf", c, ls->cost, ls->time);
                 fflush(stdout);
             }
         }

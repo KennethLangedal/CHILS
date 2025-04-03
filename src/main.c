@@ -205,13 +205,19 @@ int main(int argc, char **argv)
             else
                 printf("CHILS interval: \t%.2lf seconds\n", step);
         }
+        else if (il < LLONG_MAX)
+        {
+            printf("LS iteration limit: \t%lld\n", il);
+        }
         if (initial_solution_path != NULL)
             printf("Initial solution: \t%lld\n", initial_solution_weight);
+        printf("\n");
     }
 
     long long w10, w50, w100;
     double t10 = timeout * 0.1, t50 = timeout * 0.4, t100 = timeout * 0.5, tb = 0.0, t_total = 0.0;
     long long c10 = cl / 10ll, c50 = (cl / 10ll) * 4, c100 = (cl / 10ll) * 5;
+    long long i10 = il / 10ll, i50 = (il / 10ll) * 4, i100 = (il / 10ll) * 5;
 
     int *solution = malloc(sizeof(int) * g->n);
     for (int i = 0; i < g->n; i++)
@@ -221,6 +227,11 @@ int main(int argc, char **argv)
     {
         if (num_threads > 0)
             omp_set_num_threads(num_threads);
+
+        int nt = omp_get_max_threads();
+        printf("%d\n", nt);
+        if (nt > run_chils)
+            omp_set_num_threads(run_chils);
 
         chils *c = chils_init(g, run_chils, seed);
         c->step_time = step;
@@ -278,11 +289,11 @@ int main(int argc, char **argv)
 
         if (blocked)
         {
-            local_search_explore(g, ls, t10, il, verbose);
+            local_search_explore(g, ls, t10, i10, verbose);
             w10 = mwis_validate(g, ls->independent_set);
-            local_search_explore(g, ls, t50, il, verbose);
+            local_search_explore(g, ls, t50, i50, verbose);
             w50 = mwis_validate(g, ls->independent_set);
-            local_search_explore(g, ls, t100, il, verbose);
+            local_search_explore(g, ls, t100, i100, verbose);
             w100 = mwis_validate(g, ls->independent_set);
         }
         else

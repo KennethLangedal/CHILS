@@ -1,5 +1,7 @@
 # CHILS &mdash; Concurrent Hybrid Iterated Local Search
 
+![CHILS illustration](CHILS.png)
+
 ## Ernestine Großmann, Kenneth Langedal, and Christian Schulz
 
 Compile the project by running
@@ -16,24 +18,36 @@ There are no dependencies besides an OpenMP-compatible compiler. Adjust the CC v
 |-|-|-|-
 | **-h** | Display help information | | 
 | **-v** | Verbose mode, shows continuous updates to STDOUT | |
+| **-b** | Blocked mode, output additional results after 10%, 50%, and 100% of the  max time/iterations | |
 | **-g path** | Path to the input graph, see input forma | | &check;
 | **-i path** | Path to the initial solution, see output format | |
 | **-o path** | Path to store the best solution found, see output format | Not stored |
-| **-p N** | Run CHILS with N concurrent solutions | 1 (only LS) |
+| **-p N** | Run CHILS with **N** concurrent solutions | 1 (only LS) |
 | **-t sec** | Timeout in seconds | 3600 (1h) |
 | **-s sec** | Alternating interval for CHILS in seconds | 5 |
-| **-q N** | Max queue size after perturbe | 32 |
-| **-c T** | Set a specific number of threads | OMP_NUM_THREADS |
+| **-q N** | Max queue size **N** after perturbe | 32 |
+| **-c T** | Set number of threads to **T** | OMP_NUM_THREADS |
+| **-r s** | Set random seed to **s** | time(NULL) |
+| **-n it** | Max CHILS iterations | inf |
+| **-m it** | Max local search iterations | inf |
 
 The output of the program without the **-v** option is a single line on the format
 ```
-instance_name,#vertices,#edges,W_after_10%,W_after_50%,W_after_t,Best_t
+instance_name,#vertices,#edges,WIS,time
+```
+Using the **-b** option gives additional information about solution size after 10%, 50%, and 100% of the time/iterations. The single output line then looks like
+```
+instance_name,#vertices,#edges,WIS_after_10%,WIS_after_50%,WIS_after_100%,time
 ```
 For example, after running
 ```
 ./CHILS -g CR-T-D-4.graph
 ```
 The output could look something like this
+```
+CR-T-D-4,651861,220480534,4922752,3557.2678
+```
+And with **-b**
 ```
 CR-T-D-4,651861,220480534,4900379,4919890,4922752,3557.2678
 ```

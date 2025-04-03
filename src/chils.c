@@ -110,7 +110,7 @@ static inline int chils_find_first_worst(chils *c)
 void chils_print(chils *c, long long it, double elapsed)
 {
     int best = chils_find_overall_best(c), worst = chils_find_first_worst(c);
-    printf("\r%10lld: %12lld (%3d %.2lf) %12lld (%3d %.2lf) %.2lf %10d %10d",
+    printf("\r%6lld: %12lld (%3d %8.2lf) %12lld (%3d %8.2lf) %8.2lf %9d %9d",
            it, c->LS[best]->cost, best, c->LS[best]->time,
            c->LS[worst]->cost, worst, c->LS[worst]->time,
            elapsed, c->d_core->n, c->d_core->V[c->d_core->n]);
@@ -136,6 +136,10 @@ void chils_run(graph *g, chils *c, double tl, long long cl, int verbose)
             printf("Running chils for %.2lf seconds or %lld iterations\n", tl, cl);
         else
             printf("Running chils for %.2lf seconds\n", tl);
+        printf("%7s %12s (%3s %8s) %12s (%3s %8s) %8s %8s %8s\n", "It.",
+               "Best WIS", "id", "time",
+               "Worst WIS", "id", "time",
+               "time", "d-core V", "d-core E");
         chils_print(c, 0, elapsed);
     }
 
