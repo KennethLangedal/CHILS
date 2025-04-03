@@ -118,6 +118,6 @@ CR-T-D-4,651861,220480534,4900379,4919890,4922752,3557.2678
 ```
 Where 4900379 is the solution size after 10 minutes, 4919890 after 30, and 4922752 after 1 hour. 3557.2678 is the time when the best solution was found.
 
-# Parallel Experiments
+### Parallel Experiments
 
 The options **-n** and **-m** are used to set an exact number of CHILS/local search iterations. Together with **-r** to set a specific random seed, the execution can be made deterministic for parallel scalability experiments.
