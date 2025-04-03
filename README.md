@@ -14,6 +14,8 @@ There are no dependencies besides an OpenMP-compatible compiler. Adjust the CC v
 
 ## Program Options
 
+Note that the **-p N** option is necessary to run CHILS (**N** concurrent solutions). Otherwise, the program defaults to baseline local search.
+
 | Option | Description | Default | Mandatory
 |-|-|-|-
 | **-h** | Display help information | | 
@@ -24,7 +26,7 @@ There are no dependencies besides an OpenMP-compatible compiler. Adjust the CC v
 | **-o path** | Path to store the best solution found, see output format | Not stored |
 | **-p N** | Run CHILS with **N** concurrent solutions | 1 (only LS) |
 | **-t sec** | Timeout in seconds | 3600 (1h) |
-| **-s sec** | Alternating interval for CHILS in seconds | 5 |
+| **-s sec** | Alternating interval for CHILS in seconds | 10 |
 | **-q N** | Max queue size **N** after perturbe | 32 |
 | **-c T** | Set number of threads to **T** | OMP_NUM_THREADS |
 | **-r s** | Set random seed to **s** | time(NULL) |

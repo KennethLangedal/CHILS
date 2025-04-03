@@ -41,7 +41,7 @@ const char *help = "CHILS --- Concurrent Hybrid Iterated Local Search\n"
                    "-o path \tPath to store the best solution found \t\t default not stored\n"
                    "-p N \t\tRun CHILS with N concurrent solutions \t\t default 1 (only local search)\n"
                    "-t sec \t\tTimout in seconds \t\t\t\t default 3600 seconds\n"
-                   "-s sec \t\tAlternating interval for CHILS \t\t\t default 5 seconds\n"
+                   "-s sec \t\tAlternating interval for CHILS \t\t\t default 10 seconds\n"
                    "-q N \t\tMax queue size after perturbe \t\t\t default 32\n"
                    "-c T \t\tSet a specific number of threads  \t\t default OMP_NUM_THREADS\n"
                    "-r s \t\tSet a specific random seed \t\t\t default time(NULL)\n"
@@ -56,7 +56,7 @@ int main(int argc, char **argv)
          *initial_solution_path = NULL,
          *solution_path = NULL;
     int verbose = 0, blocked = 0, run_chils = 1, max_queue = 32, num_threads = -1;
-    double timeout = 3600, step = 5, reduction_timout = 30;
+    double timeout = 3600, step = 10, reduction_timout = 30;
 
     long long cl = LLONG_MAX, il = LLONG_MAX;
 
@@ -180,7 +180,7 @@ int main(int argc, char **argv)
     if (verbose)
     {
         if (run_chils <= 1)
-            printf("Running iterated local search\n");
+            printf("Running baseline local search (for CHILS use -p N)\n");
         else
             printf("Running CHILS using %d concurrent solutions\n", run_chils);
 
@@ -229,7 +229,7 @@ int main(int argc, char **argv)
             omp_set_num_threads(num_threads);
 
         int nt = omp_get_max_threads();
-        
+
         if (nt > run_chils)
             omp_set_num_threads(run_chils);
 

@@ -480,9 +480,9 @@ void local_search_explore(graph *g, local_search *ls, double tl, long long il, i
     if (verbose)
     {
         if (il < LLONG_MAX)
-            printf("Running local search for %.2lf seconds or %lld iterations\n", tl, il);
+            printf("Running baseline local search for %.2lf seconds or %lld iterations\n", tl, il);
         else
-            printf("Running local search for %.2lf seconds\n", tl);
+            printf("Running baseline local search for %.2lf seconds\n", tl);
         printf("%11s %12s %8s\n", "It.", "WIS", "Time");
         printf("\r%10lld: %12lld %8.2lf", 0ll, ls->cost, 0.0);
         fflush(stdout);
