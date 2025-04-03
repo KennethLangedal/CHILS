@@ -229,7 +229,7 @@ int main(int argc, char **argv)
             omp_set_num_threads(num_threads);
 
         int nt = omp_get_max_threads();
-        printf("%d\n", nt);
+        
         if (nt > run_chils)
             omp_set_num_threads(run_chils);
 
