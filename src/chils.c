@@ -136,7 +136,7 @@ void chils_run(graph *g, chils *c, double tl, long long cl, int verbose)
             printf("Running chils for %.2lf seconds or %lld iterations\n", tl, cl);
         else
             printf("Running chils for %.2lf seconds\n", tl);
-        printf("%7s %12s (%3s %8s) %12s (%3s %8s) %8s %8s %8s\n", "It.",
+        printf("%7s %12s (%3s %8s) %12s (%3s %8s) %8s %9s %9s\n", "It.",
                "Best WIS", "id", "time",
                "Worst WIS", "id", "time",
                "time", "d-core V", "d-core E");
