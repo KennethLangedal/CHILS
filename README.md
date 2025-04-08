@@ -10,11 +10,11 @@ make
 ```
 This will produce an executable called CHILS.
 
-There are no dependencies besides an OpenMP-compatible compiler. Adjust the CC variable in the Makefile if you prefer another compiler than GCC.
+There are no dependencies besides an OpenMP-compatible compiler. Adjust the CC variable in the Makefile if you prefer another compiler than GCC. Note that the code was only tested on Linux.
 
 ## Program Options
 
-Note that the **-p N** option is necessary to run CHILS (**N** concurrent solutions). Otherwise, the program defaults to baseline local search.
+Note that the **-p N** option is necessary to run CHILS (using **N** concurrent solutions). Otherwise, the program defaults to baseline local search.
 
 | Option | Description | Default | Mandatory
 |-|-|-|-
@@ -30,8 +30,8 @@ Note that the **-p N** option is necessary to run CHILS (**N** concurrent soluti
 | **-q N** | Max queue size **N** after perturbe | 32 |
 | **-c T** | Set number of threads to **T** | OMP_NUM_THREADS |
 | **-r s** | Set random seed to **s** | time(NULL) |
-| **-n it** | Max CHILS iterations | inf |
-| **-m it** | Max local search iterations | inf |
+| **-n it** | Set max CHILS iterations to **it** | inf |
+| **-m it** | Set max local search iterations to **it** | inf |
 
 The output of the program without the **-v** option is a single line on the format
 ```
