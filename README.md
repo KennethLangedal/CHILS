@@ -1,5 +1,6 @@
 # CHILS &mdash; Concurrent Hybrid Iterated Local Search
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![DOI](https://zenodo.org/badge/829941140.svg)](https://doi.org/10.5281/zenodo.15173363)
 
 ![CHILS illustration](CHILS.png)
 
