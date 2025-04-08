@@ -3,7 +3,7 @@
 
 ![CHILS illustration](CHILS.png)
 
-## Ernestine Großmann, Kenneth Langedal, and Christian Schulz
+## Installation
 
 Compile the project by running
 ```
@@ -104,6 +104,16 @@ The output format, also used as input format for the **-i** option, is simply a 
 ```
 
 ## Reproducing Results from the Paper
+
+An archive version of the paper is available on arXiv combined with the [Learn and Reduce](https://github.com/ernestine-grossmann/MWIS_learn_and_reduce) reduction framework. The CHILS part of this combined paper was accepted at SEA 2025 and will be published in the conference proceedings later in 2025.
+```
+@article{grossmann2024accelerating,
+  title    = {Accelerating Reductions Using Graph Neural Networks and a New Concurrent Local Search for the Maximum Weight Independent Set Problem},
+  author   = {Gro{\ss}mann, Ernestine and Langedal, Kenneth and Schulz, Christian},
+  journal  = {arXiv preprint arXiv:2412.14198},
+  year     = {2024}
+}
+```
 
 Using the **-b** option gives additional information about solution size after 10%, 50%, and 100% of the time/iterations. The single output line then looks like
 ```
