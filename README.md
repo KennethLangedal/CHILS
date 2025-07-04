@@ -4,6 +4,8 @@
 
 ![CHILS illustration](CHILS.png)
 
+Part of the [KaMIS &mdash; Karlsruhe Maximum Independent Sets](https://github.com/KarlsruheMIS) open source framework to compute (weighted) independent sets and vertex covers.
+
 ## Installation
 
 Compile the project by running
