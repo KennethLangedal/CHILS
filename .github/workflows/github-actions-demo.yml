@@ -24,26 +24,38 @@ jobs:
     - name: Check out repository code
       uses: actions/checkout@v4
 
-    - name: Install Make on Windows
-      if: runner.os == 'Windows'
-      run: choco install make
-
-    - name: Install OpenMP for Clang
-      if: matrix.cc == 'clang'
+    - name: Install Dependencies
+      shell: bash
       run: |
         if [ "$RUNNER_OS" == "Linux" ]; then
-          sudo apt-get update
-          sudo apt-get install -y libomp-dev
+          if [ "${{ matrix.cc }}" == "clang" ]; then
+            sudo apt-get update
+            sudo apt-get install -y libomp-dev
+          fi
         elif [ "$RUNNER_OS" == "macOS" ]; then
-          brew install libomp
+          if [ "${{ matrix.cc }}" == "gcc" ]; then
+            brew install gcc
+          else # clang
+            brew install libomp
+          fi
+        elif [ "$RUNNER_OS" == "Windows" ]; then
+          choco install make
+          if [ "${{ matrix.cc }}" == "gcc" ]; then
+            choco install mingw
+          fi
         fi
 
     - name: Build project
       shell: bash
       run: |
         if [[ "${{ matrix.cc }}" == "clang" && "$RUNNER_OS" == "macOS" ]]; then
-          make CC=clang CFLAGS="-std=gnu17 -O3 -march=native -I include -Xpreprocessor -fopenmp -DNDEBUG -I$(brew --prefix libomp)/include -L$(brew --prefix libomp)/lib"
+          # Clang on macOS needs special flags for OpenMP
+          make CC=clang CFLAGS="-std=c17 -O3 -march=native -I include -Xpreprocessor -fopenmp -DNDEBUG -I$(brew --prefix libomp)/include -L$(brew --prefix libomp)/lib -lomp"
+        elif [[ "${{ matrix.cc }}" == "gcc" && "$RUNNER_OS" == "macOS" ]]; then
+          # Use the GCC from Homebrew
+          make CC=$(brew --prefix gcc)/bin/gcc
         else
+          # Default for Linux (gcc/clang) and Windows (gcc)
           make CC=${{ matrix.cc }}
         fi
 
