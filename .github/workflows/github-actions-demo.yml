@@ -39,7 +39,13 @@ jobs:
         fi
 
     - name: Build project
-      run: make CC=${{ matrix.cc }}
+      shell: bash
+      run: |
+        if [[ "${{ matrix.cc }}" == "clang" && "$RUNNER_OS" == "macOS" ]]; then
+          make CC=clang CFLAGS="-std=gnu17 -O3 -march=native -I include -Xpreprocessor -fopenmp -DNDEBUG -I$(brew --prefix libomp)/include -L$(brew --prefix libomp)/lib"
+        else
+          make CC=${{ matrix.cc }}
+        fi
 
     - name: Test project (run executable)
       shell: bash

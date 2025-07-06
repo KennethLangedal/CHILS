@@ -195,7 +195,7 @@ void chils_run_full(void *solver, double time_limit, int n_solutions, unsigned i
     if (d->g == NULL)
         chils_construct_graph(d);
 
-    if (!graph_validate)
+    if (!graph_validate(d->g))
     {
         fprintf(stderr, "Detected errors in the graph, make sure "
                         "there are no self edges or missing endpoints\n");
@@ -223,7 +223,7 @@ void chils_run_local_search_only(void *solver, double time_limit, unsigned int s
     if (d->g == NULL)
         chils_construct_graph(d);
 
-    if (!graph_validate)
+    if (!graph_validate(d->g))
     {
         fprintf(stderr, "Detected errors in the graph, make sure "
                         "there are no self edges or missing endpoints\n");
