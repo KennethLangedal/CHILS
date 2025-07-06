@@ -20,7 +20,7 @@ graph *graph_parse(FILE *f)
     size_t size = ftell(f);
     fseek(f, 0, SEEK_SET);
 
-    char *Data = mmap(0, size, PROT_READ, MAP_PRIVATE, fileno_unlocked(f), 0);
+    char *Data = mmap(0, size, PROT_READ, MAP_PRIVATE, fileno(f), 0);
     size_t p = 0;
 
     long long n, m, t;
@@ -92,15 +92,29 @@ static inline int compare(const void *a, const void *b)
     return (*(int *)a - *(int *)b);
 }
 
+static inline int lower_bound(const int *A, int n, int x)
+{
+    const int *s = A;
+    while (n > 1)
+    {
+        int h = n / 2;
+        s += (s[h - 1] < x) * h;
+        n -= h;
+    }
+    s += (n == 1 && s[0] < x);
+    return s - A;
+}
+
 int graph_validate(graph *g)
 {
     int M = 0;
     for (int u = 0; u < g->n; u++)
     {
-        if (g->V[u + 1] - g->V[u] < 0)
+        int d_u = g->V[u + 1] - g->V[u];
+        if (d_u < 0)
             return 0;
 
-        M += g->V[u + 1] - g->V[u];
+        M += d_u;
 
         for (int i = g->V[u]; i < g->V[u + 1]; i++)
         {
@@ -111,8 +125,10 @@ int graph_validate(graph *g)
             if (v < 0 || v >= g->n || v == u || (i > g->V[u] && v <= g->E[i - 1]))
                 return 0;
 
-            // if (bsearch(&u, g->E + g->V[v], g->V[v + 1] - g->V[v], sizeof(int), compare) == NULL)
-            //     return 0;
+            int d_v = g->V[v + 1] - g->V[v];
+            int p = lower_bound(g->E + g->V[v], d_v, u);
+            if (p >= d_v || g->E[g->V[v] + p] != u)
+                return 0;
         }
     }
 

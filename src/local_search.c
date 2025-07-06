@@ -41,6 +41,9 @@ local_search *local_search_init(graph *g, unsigned int seed)
 
 void local_search_free(local_search *ls)
 {
+    if (ls == NULL)
+        return;
+
     free(ls->independent_set);
 
     free(ls->queue);
@@ -63,6 +66,7 @@ void local_search_free(local_search *ls)
 void local_search_reset(graph *g, local_search *ls)
 {
     ls->cost = 0;
+    ls->size = 0;
     ls->time = 0.0;
     ls->time_ref = omp_get_wtime();
 
@@ -115,6 +119,7 @@ void local_search_add_vertex(graph *g, local_search *ls, int u)
 
     ls->independent_set[u] = 1;
     ls->cost += g->W[u];
+    ls->size += 1;
 
     if (!ls->in_queue[u])
     {
@@ -150,6 +155,7 @@ void local_search_remove_vertex(graph *g, local_search *ls, int u)
 
     ls->independent_set[u] = 0;
     ls->cost -= g->W[u];
+    ls->size -= 1;
 
     if (!ls->in_queue[u])
     {

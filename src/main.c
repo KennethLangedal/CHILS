@@ -7,7 +7,7 @@
 
 #include "graph.h"
 #include "local_search.h"
-#include "chils.h"
+#include "chils_internal.h"
 
 long long mwis_validate(graph *g, int *independent_set)
 {

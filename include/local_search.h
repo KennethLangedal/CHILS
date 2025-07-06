@@ -5,7 +5,7 @@
 typedef struct
 {
     // Solution
-    long long cost;
+    long long cost, size;
     double time, time_ref;
     int *independent_set;
 
