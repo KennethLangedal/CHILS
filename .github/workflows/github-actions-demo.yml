@@ -28,6 +28,16 @@ jobs:
       if: runner.os == 'Windows'
       run: choco install make
 
+    - name: Install OpenMP for Clang
+      if: matrix.cc == 'clang'
+      run: |
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          sudo apt-get update
+          sudo apt-get install -y libomp-dev
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          brew install libomp
+        fi
+
     - name: Build project
       run: make CC=${{ matrix.cc }}
 
