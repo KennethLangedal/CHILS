@@ -1,18 +1,44 @@
-name: GitHub Actions Demo
-run-name: ${{ github.actor }} is testing out GitHub Actions 🚀
-on: [push]
+name: Build and Test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
 jobs:
-  Explore-GitHub-Actions:
-    runs-on: ubuntu-latest
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        cc: [gcc, clang]
+        exclude:
+          # Clang on Windows requires extra setup to work with make
+          # and is not included in this basic setup.
+          - os: windows-latest
+            cc: clang
+
     steps:
-      - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
-      - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
-      - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
-      - name: Check out repository code
-        uses: actions/checkout@v4
-      - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
-      - run: echo "🖥️ The workflow is now ready to test your code on the runner."
-      - name: List files in the repository
-        run: |
-          ls ${{ github.workspace }}
-      - run: echo "🍏 This job's status is ${{ job.status }}."
+    - name: Check out repository code
+      uses: actions/checkout@v4
+
+    - name: Install Make on Windows
+      if: runner.os == 'Windows'
+      run: choco install make
+
+    - name: Build project
+      run: make CC=${{ matrix.cc }}
+
+    - name: Test project (run executable)
+      shell: bash
+      run: |
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          ./CHILS.exe -h
+        else
+          ./CHILS -h
+        fi
+
+    - name: Clean up
+      run: make clean
