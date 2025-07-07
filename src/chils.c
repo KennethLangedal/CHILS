@@ -78,6 +78,8 @@ int chils_add_vertex(void *solver, long long weight)
 
     d->W[d->n] = weight;
     d->n++;
+
+    return d->n - 1;
 }
 
 void chils_add_edge(void *solver, int u, int v)

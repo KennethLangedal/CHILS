@@ -28,7 +28,7 @@ libCHILS.a : $(OBJ_LIB)
 	ar -rc $@ $^
 
 bin/%.o : %.c
-	$(CC) $(CFLAGS) -MMD -c $< -o $@ $(LDFLAGS) $(LDLIBS)
+	$(CC) $(CFLAGS) -MMD -c $< -o $@
 
 .PHONY : clean
 clean :
