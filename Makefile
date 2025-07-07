@@ -22,13 +22,13 @@ all : CHILS libCHILS.a
 -include $(DEP:.o=.d)
 
 CHILS : $(OBJ_CHILS)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 libCHILS.a : $(OBJ_LIB)
 	ar -rc $@ $^
 
 bin/%.o : %.c
-	$(CC) $(CFLAGS) -MMD -c $< -o $@
+	$(CC) $(CFLAGS) -MMD -c $< -o $@ $(LDFLAGS) $(LDLIBS)
 
 .PHONY : clean
 clean :
