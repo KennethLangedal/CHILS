@@ -170,7 +170,7 @@ void chils_run(graph *g, chils *c, double tl, long long cl, int verbose)
             if (c->LS[i]->cost == 0 && i == 0)
                 local_search_in_order_solution(g, c->LS[i]);
             else if (c->LS[i]->cost == 0)
-                local_search_add_vertex(g, c->LS[i], rand_r(&c->LS[i]->seed) % g->n);
+                local_search_add_vertex(g, c->LS[i], my_rand_r(&c->LS[i]->seed) % g->n);
 
             local_search_greedy(g, c->LS[i]);
         }

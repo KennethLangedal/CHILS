@@ -51,3 +51,27 @@ void local_search_perturbe(graph *g, local_search *ls);
 void local_search_explore(graph *g, local_search *ls, double tl, long long il, int verbose);
 
 void local_search_unwind(graph *g, local_search *ls, int t);
+
+static inline int my_rand_r(unsigned int *seed)
+{
+    unsigned int next = *seed;
+    int result;
+
+    next *= 1103515245;
+    next += 12345;
+    result = (unsigned int)(next / 65536) % 2048;
+
+    next *= 1103515245;
+    next += 12345;
+    result <<= 10;
+    result ^= (unsigned int)(next / 65536) % 1024;
+
+    next *= 1103515245;
+    next += 12345;
+    result <<= 10;
+    result ^= (unsigned int)(next / 65536) % 1024;
+
+    *seed = next;
+
+    return result;
+}

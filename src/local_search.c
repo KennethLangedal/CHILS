@@ -97,7 +97,7 @@ static inline void local_search_shuffle(int *list, int n, unsigned int *seed)
 {
     for (int i = 0; i < n - 1; i++)
     {
-        int j = i + (rand_r(seed) % (n - i));
+        int j = i + (my_rand_r(seed) % (n - i));
         int t = list[j];
         list[j] = list[i];
         list[i] = t;
@@ -247,7 +247,7 @@ void local_search_two_one(graph *g, local_search *ls, int u)
                 if (g->W[w1] + g->W[v] <= g->W[u])
                     continue;
 
-                long long gain = (rand_r(&ls->seed) % (1 << 30)) - (1 << 29);
+                long long gain = (my_rand_r(&ls->seed) % (1 << 30)) - (1 << 29);
                 long long diff = (g->W[w1] + g->W[v]) - g->W[u];
 
                 if (diff + gain > best)
@@ -324,9 +324,9 @@ void local_search_aap(graph *g, local_search *ls, int u, int imp)
 
             long long gain;
             if (!imp)
-                gain = (rand_r(&ls->seed) % (1 << 30)) - (1 << 29);
+                gain = (my_rand_r(&ls->seed) % (1 << 30)) - (1 << 29);
             else
-                gain = (rand_r(&ls->seed) % (2 * g->W[v])) - (g->W[v]);
+                gain = (my_rand_r(&ls->seed) % (2 * g->W[v])) - (g->W[v]);
 
             long long change = g->W[v];
             if (next >= 0 && ls->mask[next] != 2)
@@ -436,10 +436,10 @@ void local_search_greedy(graph *g, local_search *ls)
 
 void local_search_perturbe(graph *g, local_search *ls)
 {
-    int u = ls->pool[rand_r(&ls->seed) % ls->pool_size];
+    int u = ls->pool[my_rand_r(&ls->seed) % ls->pool_size];
     int q = 0;
     while (q++ < MAX_GUESS && ls->tabu[u] && ls->independent_set[u])
-        u = ls->pool[rand_r(&ls->seed) % ls->pool_size];
+        u = ls->pool[my_rand_r(&ls->seed) % ls->pool_size];
 
     if (ls->tabu[u])
         return;
@@ -461,10 +461,10 @@ void local_search_perturbe(graph *g, local_search *ls)
                         ls->cost <= best;
              i++)
         {
-            int v = ls->queue[rand_r(&ls->seed) % ls->queue_count];
+            int v = ls->queue[my_rand_r(&ls->seed) % ls->queue_count];
             q = 0;
             while (q++ < MAX_GUESS && ls->tabu[v])
-                v = ls->queue[rand_r(&ls->seed) % ls->queue_count];
+                v = ls->queue[my_rand_r(&ls->seed) % ls->queue_count];
 
             if (ls->tabu[v])
                 continue;
