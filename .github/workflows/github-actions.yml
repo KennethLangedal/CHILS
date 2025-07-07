@@ -62,11 +62,14 @@ jobs:
     - name: Test project (run executable)
       shell: bash
       run: |
+        printf "3 2 10\n15 3\n15 3\n20 1 2\n" > test.gr
         if [ "$RUNNER_OS" == "Windows" ]; then
-          ./CHILS.exe -h
+          ./CHILS.exe -g test.gr -t 1.0
         else
-          ./CHILS -h
+          ./CHILS -g test.gr -t 1.0
         fi
 
     - name: Clean up
-      run: make clean
+      run: | 
+        make clean
+        rm test.gr

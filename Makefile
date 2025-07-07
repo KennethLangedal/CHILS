@@ -22,7 +22,7 @@ all : CHILS libCHILS.a
 -include $(DEP:.o=.d)
 
 CHILS : $(OBJ_CHILS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+	$(CC) $(CFLAGS) -o $@ $^
 
 libCHILS.a : $(OBJ_LIB)
 	ar -rc $@ $^
