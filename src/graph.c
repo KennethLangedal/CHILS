@@ -2,7 +2,7 @@
 
 #include <omp.h>
 #include <stdlib.h>
-#include <sys/mman.h>
+// #include <sys/mman.h>
 
 static inline void parse_id(char *Data, size_t *p, long long *v)
 {
@@ -20,7 +20,10 @@ graph *graph_parse(FILE *f)
     size_t size = ftell(f);
     fseek(f, 0, SEEK_SET);
 
-    char *Data = mmap(0, size, PROT_READ, MAP_PRIVATE, fileno(f), 0);
+    char *Data = malloc(size);
+    size_t red = fread(Data, 1, size, f);
+
+    // char *Data = mmap(0, size, PROT_READ, MAP_PRIVATE, fileno(f), 0);
     size_t p = 0;
 
     long long n, m, t;
@@ -54,7 +57,8 @@ graph *graph_parse(FILE *f)
     }
     V[n] = ei;
 
-    munmap(Data, size);
+    // munmap(Data, size);
+    free(Data);
 
     graph *g = malloc(sizeof(graph));
     *g = (graph){.n = n, .V = V, .E = E, .W = W};
