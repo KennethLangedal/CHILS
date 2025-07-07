@@ -36,7 +36,7 @@ jobs:
           if [ "${{ matrix.cc }}" == "gcc" ]; then
             brew install gcc
           else # clang
-            brew install libomp
+            brew install llvm libomp
           fi
         elif [ "$RUNNER_OS" == "Windows" ]; then
           choco install make
