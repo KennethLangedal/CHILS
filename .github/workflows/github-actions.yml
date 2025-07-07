@@ -40,9 +40,7 @@ jobs:
           fi
         elif [ "$RUNNER_OS" == "Windows" ]; then
           choco install make
-          if [ "${{ matrix.cc }}" == "gcc" ]; then
-            choco install mingw
-          fi
+          choco install mingw
         fi
 
     - name: Build project

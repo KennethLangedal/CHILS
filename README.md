@@ -1,6 +1,7 @@
 # CHILS &mdash; Concurrent Hybrid Iterated Local Search
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![DOI](https://zenodo.org/badge/829941140.svg)](https://doi.org/10.5281/zenodo.15173363)
+[![Build and Test](https://github.com/KennethLangedal/CHILS/actions/workflows/github-actions.yml/badge.svg)](https://github.com/KennethLangedal/CHILS/actions/workflows/github-actions.yml)
 
 ![CHILS illustration](CHILS.png)
 
@@ -8,13 +9,13 @@ Part of the [KaMIS &mdash; Karlsruhe Maximum Independent Sets](https://github.co
 
 ## Installation
 
-Compile the project by running
+On linux with GCC, compile the project by running
 ```
 make
 ```
-This will produce an executable called CHILS.
+This will produce an executable called CHILS and a library libCHILS.a.
 
-There are no dependencies besides an OpenMP-compatible compiler. Adjust the CC variable in the Makefile if you prefer another compiler than GCC. Note that the code was only tested on Linux.
+There are no dependencies besides an OpenMP-compatible compiler. Adjust the CC variable in the Makefile if you prefer another compiler than GCC. For other common compilers and operating systems, see the later [installation](#installation-for-macos-and-windows) section. For details on how to use CHILS as a library in your project, see the [API](#api) section.
 
 ## Program Options
 
@@ -104,6 +105,91 @@ The output format, also used as input format for the `-i` option, is simply a li
 ```
 1
 2
+```
+
+## API
+
+The API for the library version of the project is defined in the [chils.h](include/chils.h) header. You only need the header file and the libCHILS.a to use CHILS as a library. The header file contains detailed information about the library's functionality. For example, consider the following C++ program constructing the same graph as mentioned above.
+
+```c++
+#include <iostream>
+
+#include "chils.h"
+
+int main(int argc, char **argv)
+{
+    void *solver = chils_initialize();
+
+    // Creating a graph: 15---20---15
+
+    chils_add_vertex(solver, 15); // Vertex 0
+    chils_add_vertex(solver, 15); // Vertex 1
+    chils_add_vertex(solver, 20); // Vertex 2
+
+    chils_add_edge(solver, 0, 2); // Edge {0, 2}
+    chils_add_edge(solver, 2, 1); // Edge {2, 1}
+
+    // Local search is recommended for small time limits (< 5min)
+    chils_run_local_search_only(solver, 1.0, 0);
+
+    // CHILS is recommended for larger time limits (> 5min)
+    chils_run_full(solver, 1.0, 8, 0);
+
+    std::cout << chils_solution_get_weight(solver) << std::endl;
+
+    chils_release(solver);
+
+    return 0;
+}
+```
+
+Assuming chils.h and libCHILS.a resides in the same directory as the main.cpp, you can compile this program using the following command.
+
+```
+g++ -fopenmp main.cpp -o prog -L. -lCHILS
+```
+
+## Installation for macOS and Windows
+
+Here are some guidlines for use with other operating systems and compilers than GCC on linux. If you have issues compiling the code, it might help to check the [.github/workflows/github-actions.yml](.github/workflows/github-actions.yml) file for details on how we tested the code for these platforms. 
+
+### Linux clang
+
+```
+sudo apt-get update
+sudo apt-get install -y libomp-dev
+```
+```
+make CC=clang
+```
+
+### macOS GCC
+
+```
+brew install gcc
+```
+```
+make CC=$(find $(brew --prefix gcc)/bin -name "gcc-*" | head -n 1)
+```
+(You can also select a specific version if you prefer)
+
+### macOS clang
+
+```
+brew install llvm libomp
+```
+```
+make CC=$(brew --prefix llvm)/bin/clang CFLAGS="-Xpreprocessor -I$(brew --prefix libomp)/include"
+```
+
+### Windows GCC
+
+```
+choco install make
+choco install mingw
+```
+```
+make
 ```
 
 ## Reproducing Results from the Paper
