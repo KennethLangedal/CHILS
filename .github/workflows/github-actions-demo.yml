@@ -50,11 +50,10 @@ jobs:
       run: |
         if [[ "${{ matrix.cc }}" == "clang" && "$RUNNER_OS" == "macOS" ]]; then
           # Clang on macOS needs special flags for OpenMP
-          make CC=clang CFLAGS="-std=c17 -O3 -march=native -I include -Xpreprocessor -fopenmp -DNDEBUG -I$(brew --prefix libomp)/include -L$(brew --prefix libomp)/lib -lomp"
+          make CC=clang CFLAGS="-Xpreprocessor -I$(brew --prefix libomp)/include -L$(brew --prefix libomp)/lib -lomp"
         elif [[ "${{ matrix.cc }}" == "gcc" && "$RUNNER_OS" == "macOS" ]]; then
           # Use the versioned GCC from Homebrew
-          GCC_PATH=$(find $(brew --prefix gcc)/bin -name "gcc-*" | head -n 1)
-          make CC=$GCC_PATH
+          make CC=$(find $(brew --prefix gcc)/bin -name "gcc-*" | head -n 1)
         else
           # Default for Linux (gcc/clang) and Windows (gcc)
           make CC=${{ matrix.cc }}
