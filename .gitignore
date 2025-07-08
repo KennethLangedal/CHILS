@@ -2,3 +2,15 @@
 bin/*
 CHILS
 libCHILS.a
+
+# Python
+python/build/
+python/dist/
+python/*.egg-info/
+python/*.so
+python/*/__pycache__/
+python/.pytest_cache/
+python/.eggs/
+python/*.pyc
+python/pip
+python/env

@@ -1,0 +1,23 @@
+[build-system]
+requires = [
+    "setuptools>=77.0",
+    "wheel"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "CHILS"
+version = "1.0.0"
+description = "A Python wrapper for the Concurrent Hybrid Iterated Local Search (CHILS) heuristic for the Maximum Weight Independent Set problem"
+authors = [{name = "Kenneth Langedal", email = "kenneth.langedal@hotmail.com"}]
+readme = "README.md"
+requires-python = ">=3.7"
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/KennethLangedal/CHILS"

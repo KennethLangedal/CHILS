@@ -1,7 +1,7 @@
 SHELL = /bin/bash
 
 CC ?= gcc
-override CFLAGS += -std=gnu17 -O3 -march=native -I include -fopenmp -DNDEBUG
+override CFLAGS += -std=gnu17 -O3 -march=native -I include -fopenmp -DNDEBUG -fPIC
 
 OBJ_SHARED = graph.o local_search.o chils_internal.o
 
@@ -27,9 +27,15 @@ CHILS : $(OBJ_CHILS)
 libCHILS.a : $(OBJ_LIB)
 	ar -rc $@ $^
 
+libCHILS.so : $(OBJ_LIB)
+	$(CC) $(CFLAGS) -shared -o $@ $^
+
+libCHILS.dll : $(OBJ_LIB)
+	$(CC) $(CFLAGS) -shared -o $@ $^
+
 bin/%.o : %.c
 	$(CC) $(CFLAGS) -MMD -c $< -o $@
 
 .PHONY : clean
 clean :
-	rm -f CHILS libCHILS.a $(DEP) $(DEP:.o=.d)
+	rm -f CHILS libCHILS.a libCHILS.so libCHILS.dll $(DEP) $(DEP:.o=.d)
