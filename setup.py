@@ -4,15 +4,17 @@ import platform
 from setuptools import setup, find_packages
 from setuptools.command.build_py import build_py
 
-
 class CustomBuild(build_py):
     def run(self):
         # Determine the library name based on the OS
         if platform.system() == "Windows":
-            subprocess.check_call(["make", "libCHILS.dll"])
+            subprocess.check_call(["make", "CC=gcc", "libCHILS.dll"])
             lib_name = "libCHILS.dll"
+        elif platform.system() == "Darwin":
+            subprocess.check_call(["make", "CC=gcc", "CC=$(find $(brew --prefix gcc)/bin -name 'gcc-*' | head -n 1)", "libCHILS.so"])
+            lib_name = "libCHILS.so"
         else:
-            subprocess.check_call(["make", "libCHILS.so"])
+            subprocess.check_call(["make", "CC=gcc", "libCHILS.so"])
             lib_name = "libCHILS.so"
 
         # The target directory for the library is inside the build folder
@@ -37,4 +39,5 @@ setup(
         'chils': ['*.so', '*.dll'],
     },
     include_package_data=True,
+    has_ext_modules=lambda : True
 )
