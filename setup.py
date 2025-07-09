@@ -31,7 +31,8 @@ setup(
     name='chils',
     version='1.0.0',
     author='Kenneth Langedal',
-    packages=find_packages(),
+    packages=find_packages(where="python"),
+    package_dir={"" : "python"},
     cmdclass={
         'build_py': CustomBuild,
     },

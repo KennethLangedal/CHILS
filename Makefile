@@ -1,7 +1,7 @@
 SHELL = /bin/bash
 
 CC ?= gcc
-override CFLAGS += -std=gnu17 -O3 -march=native -I include -fopenmp -DNDEBUG -fPIC
+override CFLAGS += -std=gnu17 -O3 -march=native -I include -fopenmp -fPIC -DNDEBUG
 
 OBJ_SHARED = graph.o local_search.o chils_internal.o
 
