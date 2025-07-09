@@ -11,7 +11,7 @@ class CustomBuild(build_py):
             subprocess.check_call(["make", "CC=gcc", "libCHILS.dll"])
             lib_name = "libCHILS.dll"
         elif platform.system() == "Darwin":
-            subprocess.check_call(["make", "CC=$(find $(brew --prefix gcc)/bin -name 'gcc-*' | head -n 1)", "libCHILS.so"])
+            subprocess.check_call(["make", "CC=$(find $(brew --prefix gcc)/bin -name \"gcc-*\" | head -n 1)", "libCHILS.so"])
             lib_name = "libCHILS.so"
         else:
             subprocess.check_call(["make", "CC=gcc", "libCHILS.so"])
