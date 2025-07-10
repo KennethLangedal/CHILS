@@ -21,7 +21,7 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.19.2
         env:
-          CIBW_ARCHS: "x86_64"
+          # CIBW_ARCHS: "x86_64"
           # The repair-wheel-command is used to repair the wheels, which is not needed for this project
           CIBW_REPAIR_WHEEL_COMMAND: ""
         with:
