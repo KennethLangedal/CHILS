@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import platform
 from setuptools import setup, find_packages
@@ -15,9 +16,10 @@ class CustomBuild(build_py):
             try:
                 brew_prefix = subprocess.check_output(["brew", "--prefix", "gcc"], text=True).strip()
                 gcc_bin_dir = os.path.join(brew_prefix, "bin")
-                compilers = sorted([f for f in os.listdir(gcc_bin_dir) if f.startswith("gcc-")])
+                # Filter for actual compilers, e.g., gcc-15, not gcc-ranlib-15
+                compilers = sorted([f for f in os.listdir(gcc_bin_dir) if re.match(r'^gcc-\d+$', f)])
                 if not compilers:
-                    raise FileNotFoundError("No gcc compiler found in brew directory")
+                    raise FileNotFoundError("No gcc compiler found in brew directory (e.g., gcc-15)")
                 cc_path = os.path.join(gcc_bin_dir, compilers[-1])
             except (subprocess.CalledProcessError, FileNotFoundError):
                 # Fallback to system gcc if brew command fails
