@@ -10,13 +10,21 @@ class CustomBuild(build_py):
         if platform.system() == "Windows":
             subprocess.check_call(["make", "CC=gcc", "libCHILS.dll"])
             lib_name = "libCHILS.dll"
-        elif platform.system() == "Darwin":
-            # Find the Homebrew GCC compiler
-            # gcc_prefix = subprocess.check_output(["brew", "--prefix", "gcc"]).strip().decode()
-            # gcc_path = subprocess.check_output(["find", gcc_prefix, "-name", "gcc-*", "-print", "-quit"]).strip().decode()
-            
+        elif platform.system() == "Darwin":            
+            # Find the correct gcc compiler from brew
+            try:
+                brew_prefix = subprocess.check_output(["brew", "--prefix", "gcc"], text=True).strip()
+                gcc_bin_dir = os.path.join(brew_prefix, "bin")
+                compilers = sorted([f for f in os.listdir(gcc_bin_dir) if f.startswith("gcc-")])
+                if not compilers:
+                    raise FileNotFoundError("No gcc compiler found in brew directory")
+                cc_path = os.path.join(gcc_bin_dir, compilers[-1])
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                # Fallback to system gcc if brew command fails
+                cc_path = "gcc"
+
             # Build the library with the correct compiler
-            subprocess.check_call(["make", "CC=gcc", "libCHILS.so"])
+            subprocess.check_call(["make", f"CC={cc_path}", "libCHILS.so"])
             lib_name = "libCHILS.so"
         else:
             subprocess.check_call(["make", "CC=gcc", "libCHILS.so"])
