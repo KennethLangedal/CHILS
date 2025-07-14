@@ -26,8 +26,6 @@ jobs:
         with:
           output-dir: wheels
           before-build-macos: brew install libomp
-        with:
-          output-dir: wheels
 
       - uses: actions/upload-artifact@v4
         with:
