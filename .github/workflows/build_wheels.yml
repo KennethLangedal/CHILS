@@ -22,7 +22,6 @@ jobs:
         uses: pypa/cibuildwheel@v2.19.2
         env:
           CIBW_ARCHS: auto
-          CIBW_REPAIR_WHEEL_COMMAND: ""
         with:
           output-dir: wheels
 
