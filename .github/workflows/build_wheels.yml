@@ -23,6 +23,7 @@ jobs:
         env:
           CIBW_BUILD: cp310-* cp311-* cp312-*
           CIBW_SKIP: "*-musllinux_*"
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
         with:
           output-dir: wheels
 
