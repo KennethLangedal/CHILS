@@ -15,6 +15,7 @@ jobs:
       matrix:
         os: [windows-latest]
         python-version: ["3.13"]
+        cibw_python_tag: ["313"]
 
     steps:
       - uses: actions/checkout@v4
@@ -27,7 +28,7 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.19.2
         env:
-          CIBW_BUILD: "cp${{ matrix.python-version | replace('.', '') }}-*"
+          CIBW_BUILD: "cp${{ matrix.cibw_python_tag }}-*"
           CIBW_SKIP: "*-musllinux_*"
         with:
           output-dir: wheels
