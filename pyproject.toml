@@ -31,4 +31,5 @@ before-build = "brew install gcc"
 
 [[tool.cibuildwheel.overrides]]
 select = "*-win*"
-before-build = "choco install make mingw"
+before-build = "pip install delvewheel && choco install make mingw"
+repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel}"
