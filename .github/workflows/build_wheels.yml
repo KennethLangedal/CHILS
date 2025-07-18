@@ -17,13 +17,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Copy libgomp-1.dll to package directory
+        shell: pwsh
+        run: Copy-Item -Path "C:\Julia\bin\libgomp-1.dll" -Destination "python\chils\libgomp-1.dll"
+
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.19.2
         env:
           CIBW_BUILD: cp310-*
           CIBW_SKIP: "*-musllinux_*"
           CIBW_BEFORE_BUILD_WINDOWS: "pip install delvewheel"
-          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: 'delvewheel repair -w {dest_dir} {wheel} --add-dll libgomp-1.dll --add-path "C:\Julia\bin"'
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: 'delvewheel repair -w {dest_dir} {wheel}'
         with:
           output-dir: wheels
 
