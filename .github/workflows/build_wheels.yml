@@ -20,7 +20,8 @@ jobs:
       - name: Find MinGW bin path
         shell: pwsh
         run: |
-          $mingwPath = Get-ChildItem -Path "C:\ProgramData\chocolatey\lib\mingw\tools\install" -Filter "mingw64" -Recurse -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName | Select-Object -First 1
+          $chocoInstallDir = "$env:ChocolateyInstall"
+          $mingwPath = Get-ChildItem -Path $chocoInstallDir -Filter "mingw64" -Recurse -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName | Select-Object -First 1
           if ($mingwPath) {
               $mingwBinPath = Join-Path $mingwPath "bin"
               echo "Found MinGW bin path: $mingwBinPath"
