@@ -27,7 +27,7 @@ before-build = "yum install -y gcc"
 
 [[tool.cibuildwheel.overrides]]
 select = "*-macos*"
-before-build = "brew install gcc"
+before-build = "brew install gcc && brew install libomp"
 
 [[tool.cibuildwheel.overrides]]
 select = "*-win*"
