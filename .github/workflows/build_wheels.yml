@@ -36,7 +36,7 @@ jobs:
           CIBW_BUILD: cp310-*
           CIBW_SKIP: "*-musllinux_*"
           CIBW_BEFORE_BUILD_WINDOWS: "pip install delvewheel"
-          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel repair -w {dest_dir} {wheel} --add-path "${{ env.MINGW_BIN_PATH }}""
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: 'delvewheel repair -w {dest_dir} {wheel} --add-path "${{ env.MINGW_BIN_PATH }}"'
         with:
           output-dir: wheels
 
