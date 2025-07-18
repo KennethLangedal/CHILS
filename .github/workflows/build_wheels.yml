@@ -24,17 +24,13 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Check Python version and path
-        run: |
-          python --version
-          where python
-
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.19.2
         env:
           CIBW_BUILD: cp${{ matrix.cibw_python_tag }}-*
           CIBW_ARCHS: "auto"
           CIBW_SKIP: "*-musllinux_*"
+          CIBW_BUILD_VERBOSITY: 1
         with:
           output-dir: wheels
 
