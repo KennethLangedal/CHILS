@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest]
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +24,10 @@ jobs:
       - name: Copy libwinpthread-1.dll to package directory
         shell: pwsh
         run: Copy-Item -Path "C:\Julia\bin\libwinpthread-1.dll" -Destination "python\chils\libwinpthread-1.dll"
+
+      - name: Copy libgcc_s_seh-1.dll to package directory
+        shell: pwsh
+        run: Copy-Item -Path "C:\Julia\bin\libgcc_s_seh-1.dll" -Destination "python\chils\libgcc_s_seh-1.dll"
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.19.2
