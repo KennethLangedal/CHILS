@@ -21,10 +21,11 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.19.2
         env:
-          CIBW_ARCHS: auto
-          CIBW_REPAIR_WHEEL_COMMAND: ""
+          CIBW_BUILD: cp310-* cp311-* cp312-*
+          CIBW_SKIP: "*-musllinux_*"
         with:
           output-dir: wheels
+          before-build-macos: brew install libomp
 
       - uses: actions/upload-artifact@v4
         with:
