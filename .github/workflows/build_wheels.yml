@@ -17,6 +17,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: List MinGW bin directory
+        run: dir C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin
+
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.19.2
         env:
