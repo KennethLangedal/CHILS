@@ -21,6 +21,10 @@ jobs:
         shell: pwsh
         run: Copy-Item -Path "C:\Julia\bin\libgomp-1.dll" -Destination "python\chils\libgomp-1.dll"
 
+      - name: Copy libwinpthread-1.dll to package directory
+        shell: pwsh
+        run: Copy-Item -Path "C:\Julia\bin\libwinpthread-1.dll" -Destination "python\chils\libwinpthread-1.dll"
+
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.19.2
         env:
