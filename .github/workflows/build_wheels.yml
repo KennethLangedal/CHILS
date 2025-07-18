@@ -20,17 +20,14 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.13.5'
-          check-latest: true
-          allow-prereleases: true
+          python-version: "3.10"
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.19.2
         env:
-          CIBW_BUILD: cp313-*
+          CIBW_BUILD: py3-none
           CIBW_ARCHS: "auto"
           CIBW_SKIP: "*-musllinux_*"
-          CIBW_BUILD_VERBOSITY: 1
         with:
           output-dir: wheels
 
