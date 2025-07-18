@@ -17,25 +17,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Find libgomp-1.dll
-        shell: pwsh
-        run: |
-          $libgompPath = Get-ChildItem -Path "C:" -Filter "libgomp-1.dll" -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName | Select-Object -First 1
-          if ($libgompPath) {
-              echo "Found libgomp-1.dll at: $libgompPath"
-              echo "LIBGOMP_DLL_PATH=$libgompPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          } else {
-              Write-Error "libgomp-1.dll not found on C: drive!" # This will cause the step to fail
-              exit 1
-          }
-
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.19.2
         env:
           CIBW_BUILD: cp310-*
           CIBW_SKIP: "*-musllinux_*"
           CIBW_BEFORE_BUILD_WINDOWS: "pip install delvewheel"
-          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: 'delvewheel repair -w {dest_dir} {wheel} --add-dll "${{ env.LIBGOMP_DLL_PATH }}"'
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: 'delvewheel repair -w {dest_dir} {wheel} --add-dll libgomp-1.dll --add-path "C:\Julia\bin"'
         with:
           output-dir: wheels
 
