@@ -17,8 +17,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: List MinGW bin directory
-        run: dir C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin
+      - name: Find MinGW bin path
+        shell: pwsh
+        run: |
+          $mingwPath = Get-ChildItem -Path "C:\ProgramData\chocolatey\lib\mingw\tools\install" -Filter "mingw64" -Recurse -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName | Select-Object -First 1
+          if ($mingwPath) {
+              $mingwBinPath = Join-Path $mingwPath "bin"
+              echo "Found MinGW bin path: $mingwBinPath"
+              echo "MINGW_BIN_PATH=$mingwBinPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          } else {
+              Write-Error "MinGW bin path not found!"
+              exit 1
+          }
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.19.2
@@ -26,7 +36,7 @@ jobs:
           CIBW_BUILD: cp310-*
           CIBW_SKIP: "*-musllinux_*"
           CIBW_BEFORE_BUILD_WINDOWS: "pip install delvewheel"
-          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel repair -w {dest_dir} {wheel} --add-path \"C:\\ProgramData\\chocolatey\\lib\\mingw\\tools\\install\\mingw64\\bin\""
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel repair -w {dest_dir} {wheel} --add-path "${{ env.MINGW_BIN_PATH }}""
         with:
           output-dir: wheels
 
