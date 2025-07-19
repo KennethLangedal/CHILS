@@ -34,7 +34,7 @@ libCHILS.dll : $(OBJ_LIB)
 	$(CC) $(CFLAGS) -shared -o $@ $^ $(LDFLAGS)
 
 bin/%.o : %.c
-	$(CC) $(CFLAGS) -MMD -c $< -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) -MMD -c $< -o $@
 
 .PHONY : clean
 clean :
