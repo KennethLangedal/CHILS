@@ -22,19 +22,19 @@ all : CHILS libCHILS.a
 -include $(DEP:.o=.d)
 
 CHILS : $(OBJ_CHILS)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 libCHILS.a : $(OBJ_LIB)
 	ar -rc $@ $^
 
 libCHILS.so : $(OBJ_LIB)
-	$(CC) $(CFLAGS) -shared -o $@ $^
+	$(CC) $(CFLAGS) -shared -o $@ $^ $(LDFLAGS)
 
 libCHILS.dll : $(OBJ_LIB)
-	$(CC) $(CFLAGS) -shared -o $@ $^
+	$(CC) $(CFLAGS) -shared -o $@ $^ $(LDFLAGS)
 
 bin/%.o : %.c
-	$(CC) $(CFLAGS) -MMD -c $< -o $@
+	$(CC) $(CFLAGS) -MMD -c $< -o $@ $(LDFLAGS)
 
 .PHONY : clean
 clean :
