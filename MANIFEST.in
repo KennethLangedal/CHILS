@@ -1,5 +1,0 @@
-include Makefile
-include LICENSE
-recursive-include src/ *.c
-recursive-include include/ *.h
-recursive-include bin/ .gitignore
