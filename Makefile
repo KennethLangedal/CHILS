@@ -1,4 +1,4 @@
-SHELL = /bin/bash
+SHELL = /usr/bin/env bash
 
 CC ?= gcc
 override CFLAGS += -std=gnu17 -O3 -march=native -I include -fopenmp -fPIC -DNDEBUG
