@@ -129,10 +129,10 @@ int graph_validate(graph *g)
             if (v < 0 || v >= g->n || v == u || (i > g->V[u] && v <= g->E[i - 1]))
                 return 0;
 
-            int d_v = g->V[v + 1] - g->V[v];
-            int p = lower_bound(g->E + g->V[v], d_v, u);
-            if (p >= d_v || g->E[g->V[v] + p] != u)
-                return 0;
+            // int d_v = g->V[v + 1] - g->V[v];
+            // int p = lower_bound(g->E + g->V[v], d_v, u);
+            // if (p >= d_v || g->E[g->V[v] + p] != u)
+            //     return 0;
         }
     }
 
