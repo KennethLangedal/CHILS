@@ -5,7 +5,7 @@
 #include "chils_internal.h"
 
 #define MIN_CORE 512
-#define DEFAULT_STEP_TIME 5.0
+#define DEFAULT_STEP_TIME 10.0
 #define DEFAULT_STEP_COUNT LLONG_MAX
 
 chils *chils_init(graph *g, int p, unsigned int seed)
@@ -25,6 +25,7 @@ chils *chils_init(graph *g, int p, unsigned int seed)
 
     c->d_core = malloc(sizeof(graph));
     c->d_core->n = 0;
+    c->d_core->m = 0;
     c->d_core->V = malloc(sizeof(int) * (g->n + 1));
     c->d_core->V[0] = 0;
     c->d_core->E = malloc(sizeof(int) * g->V[g->n]);
@@ -43,8 +44,8 @@ chils *chils_init(graph *g, int p, unsigned int seed)
         }
     }
 
-    c->S1 = malloc(sizeof(int) * nt);
-    c->S2 = malloc(sizeof(int) * nt);
+    c->S1 = malloc(sizeof(long long) * nt);
+    c->S2 = malloc(sizeof(long long) * nt);
 
 #pragma omp parallel
     {
@@ -128,10 +129,10 @@ static inline int chils_find_first_worst(chils *c)
 void chils_print(chils *c, long long it, double elapsed)
 {
     int best = chils_find_overall_best(c), worst = chils_find_first_worst(c);
-    printf("\r%6lld: %12lld (%3d %8.2lf) %12lld (%3d %8.2lf) %8.2lf %9d %9d",
+    printf("\r%6lld: %12lld (%3d %8.2lf) %12lld (%3d %8.2lf) %8.2lf %9d %12lld",
            it, c->LS[best]->cost, best, c->LS[best]->time,
            c->LS[worst]->cost, worst, c->LS[worst]->time,
-           elapsed, c->d_core->n, c->d_core->V[c->d_core->n]);
+           elapsed, c->d_core->n, c->d_core->m);
     fflush(stdout);
 }
 
@@ -155,10 +156,10 @@ void chils_run(graph *g, chils *c, double tl, long long cl, int verbose)
             printf("Running chils for %.2lf seconds or %lld iterations\n", tl, cl);
         else
             printf("Running chils for %.2lf seconds\n", tl);
-        printf("%7s %12s (%3s %8s) %12s (%3s %8s) %8s %9s %9s\n", "It.",
+        printf("%7s %12s (%3s %8s) %12s (%3s %8s) %8s %9s %12s\n", "It.",
                "Best WIS", "id", "time",
                "Worst WIS", "id", "time",
-               "time", "d-core V", "d-core E");
+               "time", "D-Core V", "D-Core E");
         chils_print(c, 0, elapsed);
     }
 
@@ -222,6 +223,12 @@ void chils_run(graph *g, chils *c, double tl, long long cl, int verbose)
 
             graph_subgraph_par(g, c->d_core, c->A, c->RM, c->FM, c->S1, c->S2);
 
+#pragma omp single
+            {
+                if (verbose)
+                    chils_print(c, ci, elapsed);
+            }
+
             /* D-core LS */
 #pragma omp for
             for (int i = 0; i < c->p; i++)
@@ -282,13 +289,11 @@ void chils_run(graph *g, chils *c, double tl, long long cl, int verbose)
         printf("\n");
 }
 
-void chils_set_solution(graph *g, chils *c, const int *I)
+void chils_set_solution(graph *g, chils *c, int i, const int *I)
 {
-#pragma omp for
-    for (int i = 0; i < c->p; i++)
-        for (int j = 0; j < g->n; j++)
-            if (I[j])
-                local_search_add_vertex(g, c->LS[i], j);
+    for (int j = 0; j < g->n; j++)
+        if (I[j])
+            local_search_add_vertex(g, c->LS[i], j);
 }
 
 int *chils_get_best_independent_set(chils *c)

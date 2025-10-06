@@ -3,9 +3,11 @@
 
 typedef struct
 {
-    int n;
-    int *V, *E;
-    long long *W;
+    int n;        // Number of vertices
+    long long m;  // Number of edges
+    long long *V; // Neighborhood pointers
+    int *E;       // Edgelist
+    long long *W; // Vertex weights
 } graph;
 
 graph *graph_parse(FILE *f);
@@ -19,4 +21,4 @@ int graph_validate(graph *g);
 graph *graph_subgraph(graph *g, int *Mask, int *RM);
 
 // Should be called inside parallel region
-void graph_subgraph_par(graph *g, graph *sg, int *Mask, int *RM, int *FM, int *S1, int *S2);
+void graph_subgraph_par(graph *g, graph *sg, int *Mask, int *RM, int *FM, long long *S1, long long *S2);

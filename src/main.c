@@ -1,10 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <getopt.h>
+#include <dirent.h>
 #include <limits.h>
 #include <time.h>
 #include <omp.h>
+#include <sys/stat.h>
 
 #include "graph.h"
 #include "local_search.h"
@@ -19,7 +22,7 @@ long long mwis_validate(graph *g, int *independent_set)
             continue;
 
         cost += g->W[u];
-        for (int i = g->V[u]; i < g->V[u + 1]; i++)
+        for (long long i = g->V[u]; i < g->V[u + 1]; i++)
         {
             int v = g->E[i];
             if (independent_set[v])
@@ -29,6 +32,72 @@ long long mwis_validate(graph *g, int *independent_set)
     return cost;
 }
 
+int *mwis_parse_solution(graph *g, const char *path, long long *cost)
+{
+    FILE *f = fopen(path, "r");
+    if (f == NULL)
+    {
+        fprintf(stderr, "Unable to open file %s\n", path);
+        exit(1);
+    }
+
+    int *I = malloc(sizeof(int) * g->n);
+    for (int i = 0; i < g->n; i++)
+        I[i] = 0;
+
+    int u = 0;
+    while (fscanf(f, "%d", &u) != EOF)
+        I[u - 1] = 1;
+
+    *cost = mwis_validate(g, I);
+    if (*cost < 0)
+    {
+        fprintf(stderr, "Initial solution is not valid\n");
+        exit(1);
+    }
+
+    fclose(f);
+}
+
+void mwis_populate_solutions(graph *g, chils *c, const char *dir_path, int verbose)
+{
+    DIR *dir = opendir(dir_path);
+    if (dir == NULL)
+    {
+        fprintf(stderr, "Unable to open folder path %s\n", dir_path);
+        exit(1);
+    }
+
+    struct dirent *entry;
+    char path[4096];
+    struct stat st;
+
+    int i = 0;
+
+    while ((entry = readdir(dir)) != NULL && i < c->p)
+    {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
+
+        snprintf(path, sizeof(path), "%s/%s", dir_path, entry->d_name);
+
+        long long cost = 0;
+        int *I = mwis_parse_solution(g, path, &cost);
+
+        if (verbose)
+        {
+            printf("Solution %2d: %lld\n", cost);
+        }
+
+        chils_set_solution(g, c, i, I);
+
+        free(I);
+        i++;
+    }
+
+    closedir(dir);
+}
+
 const char *help = "CHILS --- Concurrent Hybrid Iterated Local Search\n"
                    "\nThe output of the program without -v or -b is a single line on the form:\n"
                    "instance_name,#vertices,#edges,is_weight,solution_time,total_time\n"
@@ -36,12 +105,13 @@ const char *help = "CHILS --- Concurrent Hybrid Iterated Local Search\n"
                    "instance_name,#vertices,#edges,is_weight_after_10\%,is_weight_after_50\%,is_weight_after_100\%,solution_time,total_time\n"
                    "\n-h \t\tDisplay this help message\n"
                    "-v \t\tVerbose mode, output continous updates to STDOUT\n"
-                   "-b \t\tBlocked mode, output additional results after 10\%, 50\%, and 100\% of the  max time/iterations\n"
+                   "-b \t\tBlocked mode, output additional results after \n\t\t10\%, 50\%, and 100\% of the  max time/iterations\n"
                    "-g path* \tPath to the input graph in METIS format\n"
                    "-i path \tPath to initial solution (1-indexed list)\n"
+                   "-f path \tPath to folder containing initial solutions\n"
                    "-o path \tPath to store the best solution found \t\t default not stored\n"
-                   "-p N \t\tRun CHILS with N concurrent solutions \t\t default 1 (only local search)\n"
-                   "-t sec \t\tTimout in seconds \t\t\t\t default 3600 seconds\n"
+                   "-p N \t\tRun CHILS with N concurrent solutions \t\t default 16\n"
+                   "-t sec \t\tTimeout in seconds \t\t\t\t default 3600 seconds\n"
                    "-s sec \t\tAlternating interval for CHILS \t\t\t default 10 seconds\n"
                    "-q N \t\tMax queue size after perturbe \t\t\t default 32\n"
                    "-c T \t\tSet a specific number of threads  \t\t default OMP_NUM_THREADS\n"
@@ -55,9 +125,10 @@ int main(int argc, char **argv)
 {
     char *graph_path = NULL,
          *initial_solution_path = NULL,
+         *initial_solution_folder_path = NULL,
          *solution_path = NULL;
-    int verbose = 0, blocked = 0, run_chils = 1, max_queue = 32, num_threads = -1;
-    double timeout = 3600, step = 10, reduction_timout = 30;
+    int verbose = 0, blocked = 0, run_chils = 16, max_queue = 32, num_threads = 0;
+    double timeout = 3600, step = 10;
 
     long long cl = LLONG_MAX, il = LLONG_MAX;
 
@@ -83,6 +154,9 @@ int main(int argc, char **argv)
             break;
         case 'i':
             initial_solution_path = optarg;
+            break;
+        case 'f':
+            initial_solution_folder_path = optarg;
             break;
         case 'o':
             solution_path = optarg;
@@ -145,29 +219,7 @@ int main(int argc, char **argv)
 
     if (initial_solution_path != NULL)
     {
-        f = fopen(initial_solution_path, "r");
-        if (f == NULL)
-        {
-            fprintf(stderr, "Unable to open file %s\n", initial_solution_path);
-            return 1;
-        }
-
-        initial_solution = malloc(sizeof(int) * g->n);
-        for (int i = 0; i < g->n; i++)
-            initial_solution[i] = 0;
-
-        int u = 0;
-        while (fscanf(f, "%d", &u) != EOF)
-            initial_solution[u - 1] = 1;
-
-        initial_solution_weight = mwis_validate(g, initial_solution);
-        if (initial_solution_weight < 0)
-        {
-            fprintf(stderr, "Initial solution is not valid\n");
-            return 1;
-        }
-
-        fclose(f);
+        mwis_parse_solution(g, initial_solution_path, &initial_solution_weight);
     }
 
     int path_offset = 0, path_end = 0;
@@ -190,7 +242,7 @@ int main(int argc, char **argv)
 
         printf("Input: \t\t\t%s\n", graph_path + path_offset);
         printf("Vertices: \t\t%d\n", g->n);
-        printf("Edges: \t\t\t%d\n", g->V[g->n] / 2);
+        printf("Edges: \t\t\t%lld\n", g->m / 2);
         printf("Seed: \t\t\t%u\n", seed);
         if (solution_path != NULL)
             printf("Output: \t\t%s\n", solution_path);
@@ -212,6 +264,10 @@ int main(int argc, char **argv)
         }
         if (initial_solution_path != NULL)
             printf("Initial solution: \t%lld\n", initial_solution_weight);
+        if (num_threads > 0)
+            printf("Threads: \t\t%d\n", num_threads > run_chils ? run_chils : num_threads);
+        else if (run_chils > 1 && num_threads < 1)
+            printf("Threads: \t\t#OMP_NUM_THREADS threads\n");
         printf("\n");
     }
 
@@ -239,7 +295,14 @@ int main(int argc, char **argv)
         c->step_count = il;
 
         if (initial_solution != NULL)
-            chils_set_solution(g, c, initial_solution);
+        {
+            for (int i = 1; i < c->p; i++)
+                chils_set_solution(g, c, i, initial_solution);
+        }
+        if (initial_solution_folder_path != NULL)
+        {
+            mwis_populate_solutions(g, c, initial_solution_folder_path, verbose);
+        }
 
         for (int i = 0; i < run_chils; i++)
         {
@@ -315,11 +378,11 @@ int main(int argc, char **argv)
     }
 
     if (blocked)
-        printf("%s,%d,%d,%lld,%lld,%lld,%.4lf,%.4lf\n", graph_path + path_offset,
-               g->n, g->V[g->n] / 2, w10, w50, w100, tb, t_total);
+        printf("%s,%d,%lld,%lld,%lld,%lld,%.4lf,%.4lf\n", graph_path + path_offset,
+               g->n, g->m / 2, w10, w50, w100, tb, t_total);
     else
-        printf("%s,%d,%d,%lld,%.4lf,%.4lf\n", graph_path + path_offset,
-               g->n, g->V[g->n] / 2, w100, tb, t_total);
+        printf("%s,%d,%lld,%lld,%.4lf,%.4lf\n", graph_path + path_offset,
+               g->n, g->m / 2, w100, tb, t_total);
 
     if (solution_path != NULL)
     {

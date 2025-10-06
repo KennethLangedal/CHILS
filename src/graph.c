@@ -2,7 +2,7 @@
 
 #include <omp.h>
 #include <stdlib.h>
-// #include <sys/mman.h>
+#include <limits.h>
 
 static inline void parse_id(char *Data, size_t *p, long long *v)
 {
@@ -22,8 +22,6 @@ graph *graph_parse(FILE *f)
 
     char *Data = malloc(size);
     size_t red = fread(Data, 1, size, f);
-
-    // char *Data = mmap(0, size, PROT_READ, MAP_PRIVATE, fileno(f), 0);
     size_t p = 0;
 
     long long n, m, t;
@@ -31,12 +29,18 @@ graph *graph_parse(FILE *f)
     parse_id(Data, &p, &m);
     parse_id(Data, &p, &t);
 
-    int *V = malloc(sizeof(int) * (n + 1));
+    if (n >= INT_MAX)
+    {
+        fprintf(stderr, "Number of vertices must be less than %d, got %lld\n", INT_MAX, n);
+        exit(1);
+    }
+
+    long long *V = malloc(sizeof(long long) * (n + 1));
     int *E = malloc(sizeof(int) * (m * 2));
 
     long long *W = malloc(sizeof(long long) * n);
 
-    int ei = 0;
+    long long ei = 0;
     for (int u = 0; u < n; u++)
     {
         parse_id(Data, &p, W + u);
@@ -50,18 +54,23 @@ graph *graph_parse(FILE *f)
 
             long long e;
             parse_id(Data, &p, &e);
+
+            if (e > n)
+            {
+                fprintf(stderr, "Edge endpoint out of bounds, {%lld, %lld}\n", u + 1ll, e);
+                exit(1);
+            }
+
             E[ei++] = e - 1;
-            ;
         }
         p++;
     }
     V[n] = ei;
 
-    // munmap(Data, size);
     free(Data);
 
     graph *g = malloc(sizeof(graph));
-    *g = (graph){.n = n, .V = V, .E = E, .W = W};
+    *g = (graph){.n = n, .m = ei, .V = V, .E = E, .W = W};
 
     return g;
 }
@@ -69,7 +78,7 @@ graph *graph_parse(FILE *f)
 // store graph in metis format
 void graph_store(FILE *f, graph *g)
 {
-    fprintf(f, "%d %d 10\n", g->n, g->V[g->n] / 2);
+    fprintf(f, "%d %lld 10\n", g->n, g->m / 2);
     for (int u = 0; u < g->n; u++)
     {
         fprintf(f, "%lld", g->W[u]);
@@ -91,24 +100,6 @@ void graph_free(graph *g)
     free(g);
 }
 
-static inline int compare(const void *a, const void *b)
-{
-    return (*(int *)a - *(int *)b);
-}
-
-static inline int lower_bound(const int *A, int n, int x)
-{
-    const int *s = A;
-    while (n > 1)
-    {
-        int h = n / 2;
-        s += (s[h - 1] < x) * h;
-        n -= h;
-    }
-    s += (n == 1 && s[0] < x);
-    return s - A;
-}
-
 int graph_validate(graph *g)
 {
     int M = 0;
@@ -120,23 +111,18 @@ int graph_validate(graph *g)
 
         M += d_u;
 
-        for (int i = g->V[u]; i < g->V[u + 1]; i++)
+        for (long long i = g->V[u]; i < g->V[u + 1]; i++)
         {
-            if (i < 0 || i >= g->V[g->n])
+            if (i < 0 || i >= g->m)
                 return 0;
 
             int v = g->E[i];
             if (v < 0 || v >= g->n || v == u || (i > g->V[u] && v <= g->E[i - 1]))
                 return 0;
-
-            // int d_v = g->V[v + 1] - g->V[v];
-            // int p = lower_bound(g->E + g->V[v], d_v, u);
-            // if (p >= d_v || g->E[g->V[v] + p] != u)
-            //     return 0;
         }
     }
 
-    if (M != g->V[g->n])
+    if (M != g->V[g->n] || M != g->m)
         return 0;
 
     return 1;
@@ -145,7 +131,7 @@ int graph_validate(graph *g)
 graph *graph_subgraph(graph *g, int *Mask, int *RM)
 {
     int *FM = malloc(sizeof(int) * g->n);
-    int n = 0, m = 0;
+    long long n = 0, m = 0;
     for (int u = 0; u < g->n; u++)
     {
         if (!Mask[u])
@@ -155,7 +141,7 @@ graph *graph_subgraph(graph *g, int *Mask, int *RM)
         RM[n] = u;
         n++;
 
-        for (int i = g->V[u]; i < g->V[u + 1]; i++)
+        for (long long i = g->V[u]; i < g->V[u + 1]; i++)
             if (Mask[g->E[i]])
                 m++;
     }
@@ -163,7 +149,7 @@ graph *graph_subgraph(graph *g, int *Mask, int *RM)
     graph *sg = malloc(sizeof(graph));
     *sg = (graph){.n = n};
 
-    sg->V = malloc(sizeof(int) * (n + 1));
+    sg->V = malloc(sizeof(long long) * (n + 1));
     sg->E = malloc(sizeof(int) * m);
     sg->W = malloc(sizeof(long long) * n);
 
@@ -176,7 +162,7 @@ graph *graph_subgraph(graph *g, int *Mask, int *RM)
         sg->W[FM[u]] = g->W[u];
         sg->V[FM[u]] = m;
 
-        for (int i = g->V[u]; i < g->V[u + 1]; i++)
+        for (long long i = g->V[u]; i < g->V[u + 1]; i++)
         {
             int v = g->E[i];
             if (!Mask[v])
@@ -193,11 +179,12 @@ graph *graph_subgraph(graph *g, int *Mask, int *RM)
     return sg;
 }
 
-void graph_subgraph_par(graph *g, graph *sg, int *Mask, int *RM, int *FM, int *S1, int *S2)
+void graph_subgraph_par(graph *g, graph *sg, int *Mask, int *RM, int *FM, long long *S1, long long *S2)
 {
     int nt = omp_get_num_threads();
     int tid = omp_get_thread_num();
-    int n = 0, m = 0;
+    long long n = 0, m = 0;
+
 #pragma omp for nowait
     for (int u = 0; u < g->n; u++)
     {
@@ -206,7 +193,7 @@ void graph_subgraph_par(graph *g, graph *sg, int *Mask, int *RM, int *FM, int *S
 
         n++;
 
-        for (int i = g->V[u]; i < g->V[u + 1]; i++)
+        for (long long i = g->V[u]; i < g->V[u + 1]; i++)
             if (Mask[g->E[i]])
                 m++;
     }
@@ -216,14 +203,11 @@ void graph_subgraph_par(graph *g, graph *sg, int *Mask, int *RM, int *FM, int *S
 
 #pragma omp barrier
 
-    int n_o = 0, m_o = 0;
+    long long n_offset = 0;
     for (int i = 0; i < tid; i++)
-    {
-        n_o += S1[i];
-        m_o += S2[i];
-    }
+        n_offset += S1[i];
 
-    n = n_o;
+    n = n_offset;
 #pragma omp for
     for (int u = 0; u < g->n; u++)
     {
@@ -236,7 +220,11 @@ void graph_subgraph_par(graph *g, graph *sg, int *Mask, int *RM, int *FM, int *S
         n++;
     }
 
-    m = m_o;
+    long long m_offset = 0;
+    for (int i = 0; i < tid; i++)
+        m_offset += S2[i];
+
+    m = m_offset;
 #pragma omp for nowait
     for (int u = 0; u < g->n; u++)
     {
@@ -245,7 +233,7 @@ void graph_subgraph_par(graph *g, graph *sg, int *Mask, int *RM, int *FM, int *S
 
         sg->V[FM[u]] = m;
 
-        for (int i = g->V[u]; i < g->V[u + 1]; i++)
+        for (long long i = g->V[u]; i < g->V[u + 1]; i++)
         {
             int v = g->E[i];
             if (!Mask[v])
@@ -259,6 +247,7 @@ void graph_subgraph_par(graph *g, graph *sg, int *Mask, int *RM, int *FM, int *S
     if (tid == nt - 1)
     {
         sg->n = n;
+        sg->m = m;
         sg->V[sg->n] = m;
     }
 #pragma omp barrier

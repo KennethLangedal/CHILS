@@ -27,7 +27,6 @@ local_search *local_search_init(graph *g, unsigned int seed)
     ls->tightness = malloc(sizeof(int) * g->n);
     ls->temp = malloc(sizeof(int) * g->n * 2);
     ls->mask = malloc(sizeof(int) * g->n);
-    ls->pool = malloc(sizeof(int) * g->n);
 
     ls->log_alloc = g->n;
     ls->log = malloc(sizeof(int) * ls->log_alloc);
@@ -56,7 +55,6 @@ void local_search_free(local_search *ls)
     free(ls->tightness);
     free(ls->temp);
     free(ls->mask);
-    free(ls->pool);
 
     free(ls->log);
 
@@ -71,7 +69,6 @@ void local_search_reset(graph *g, local_search *ls)
     ls->time_ref = omp_get_wtime();
 
     ls->queue_count = g->n;
-    ls->pool_size = g->n;
 
     ls->log_count = 0;
     ls->log_enabled = 0;
@@ -89,7 +86,6 @@ void local_search_reset(graph *g, local_search *ls)
         ls->tightness[u] = 0;
         ls->temp[u] = 0;
         ls->mask[u] = 0;
-        ls->pool[u] = u;
     }
 }
 
@@ -128,7 +124,7 @@ void local_search_add_vertex(graph *g, local_search *ls, int u)
         ls->queue_count++;
     }
 
-    for (int i = g->V[u]; i < g->V[u + 1]; i++)
+    for (long long i = g->V[u]; i < g->V[u + 1]; i++)
     {
         int v = g->E[i];
         if (ls->independent_set[v])
@@ -164,7 +160,7 @@ void local_search_remove_vertex(graph *g, local_search *ls, int u)
         ls->queue_count++;
     }
 
-    for (int i = g->V[u]; i < g->V[u + 1]; i++)
+    for (long long i = g->V[u]; i < g->V[u + 1]; i++)
     {
         int v = g->E[i];
         ls->adjacent_weight[v] -= g->W[u];
@@ -183,8 +179,10 @@ void local_search_lock_vertex(graph *g, local_search *ls, int u)
 {
     ls->tabu[u]++;
     if (ls->independent_set[u])
-        for (int i = g->V[u]; i < g->V[u + 1]; i++)
+    {
+        for (long long i = g->V[u]; i < g->V[u + 1]; i++)
             ls->tabu[g->E[i]]++;
+    }
 }
 
 void local_search_unlock_vertex(graph *g, local_search *ls, int u)
@@ -199,7 +197,7 @@ void local_search_unlock_vertex(graph *g, local_search *ls, int u)
     if (!ls->independent_set[u])
         return;
 
-    for (int i = g->V[u]; i < g->V[u + 1]; i++)
+    for (long long i = g->V[u]; i < g->V[u + 1]; i++)
     {
         int v = g->E[i];
         ls->tabu[v]--;
@@ -218,9 +216,11 @@ void local_search_two_one(graph *g, local_search *ls, int u)
     assert(ls->independent_set[u] && !ls->tabu[u]);
 
     int adjacent_count = 0;
-    for (int i = g->V[u]; i < g->V[u + 1]; i++)
+    for (long long i = g->V[u]; i < g->V[u + 1]; i++)
+    {
         if (ls->tightness[g->E[i]] == 1 && !ls->tabu[g->E[i]])
             ls->temp[adjacent_count++] = g->E[i];
+    }
 
     if (adjacent_count < 2)
         return;
@@ -231,7 +231,8 @@ void local_search_two_one(graph *g, local_search *ls, int u)
     {
         int v = ls->temp[i];
 
-        int i1 = 0, i2 = g->V[v];
+        int i1 = 0;
+        long long i2 = g->V[v];
         while (i1 < adjacent_count && i2 < g->V[v + 1])
         {
             int w1 = ls->temp[i1], w2 = g->E[i2];
@@ -279,7 +280,7 @@ void local_search_aap(graph *g, local_search *ls, int u, int imp)
     }
     else
     {
-        for (int i = g->V[u]; i < g->V[u + 1]; i++)
+        for (long long i = g->V[u]; i < g->V[u + 1]; i++)
         {
             int v = g->E[i];
             if (ls->independent_set[v])
@@ -303,14 +304,14 @@ void local_search_aap(graph *g, local_search *ls, int u, int imp)
         long long best = INT_MIN;
         int to_add, to_remove;
 
-        for (int i = g->V[current]; i < g->V[current + 1]; i++)
+        for (long long i = g->V[current]; i < g->V[current + 1]; i++)
         {
             int v = g->E[i];
             if (ls->tightness[v] != 2 || ls->mask[v] == 1 || ls->tabu[v])
                 continue;
 
             int valid = 1, next = -1;
-            for (int j = g->V[v]; j < g->V[v + 1] && valid; j++)
+            for (long long j = g->V[v]; j < g->V[v + 1] && valid; j++)
             {
                 int w = g->E[j];
                 if (w == current)
@@ -366,7 +367,7 @@ void local_search_aap(graph *g, local_search *ls, int u, int imp)
         else if (!ls->independent_set[v])
         {
             diff += g->W[v];
-            ls->temp[g->n + to_add++] = v;
+            ls->temp[(long long)g->n + to_add++] = v;
         }
 
         if (ls->independent_set[v] && diff > best)
@@ -383,7 +384,7 @@ void local_search_aap(graph *g, local_search *ls, int u, int imp)
     {
         for (int i = 0; i < best_position; i++)
         {
-            int v = ls->temp[g->n + i];
+            int v = ls->temp[(long long)g->n + i];
             local_search_add_vertex(g, ls, v);
         }
     }
@@ -392,7 +393,7 @@ void local_search_aap(graph *g, local_search *ls, int u, int imp)
         ls->mask[ls->temp[i]] = 0;
 }
 
-void swap(int **a, int **b)
+static inline void local_search_swap(int **a, int **b)
 {
     int *t = *a;
     *a = *b;
@@ -407,8 +408,8 @@ void local_search_greedy(graph *g, local_search *ls)
     ls->queue_count = 0;
     while (n > 0)
     {
-        swap(&ls->queue, &ls->prev_queue);
-        swap(&ls->in_queue, &ls->in_prev_queue);
+        local_search_swap(&ls->queue, &ls->prev_queue);
+        local_search_swap(&ls->in_queue, &ls->in_prev_queue);
 
         for (int i = 0; i < n; i++)
         {
@@ -423,7 +424,7 @@ void local_search_greedy(graph *g, local_search *ls)
             else if (ls->independent_set[u] && g->V[u + 1] - g->V[u] < MAX_TWO_ONE_DEGREE)
                 local_search_two_one(g, ls, u);
 
-            if (ls->tightness[u] == 1 && g->V[g->n] < AAP_LIMIT)
+            if (ls->tightness[u] == 1 && g->m < AAP_LIMIT)
                 local_search_aap(g, ls, u, 1);
         }
 
@@ -436,26 +437,30 @@ void local_search_greedy(graph *g, local_search *ls)
 
 void local_search_perturbe(graph *g, local_search *ls)
 {
-    int u = ls->pool[my_rand_r(&ls->seed) % ls->pool_size];
+    int u = my_rand_r(&ls->seed) % g->n;
     int q = 0;
-    while (q++ < MAX_GUESS && ls->tabu[u] && ls->independent_set[u])
-        u = ls->pool[my_rand_r(&ls->seed) % ls->pool_size];
+    while (q++ < MAX_GUESS && ls->tabu[u])
+        u = my_rand_r(&ls->seed) % g->n;
 
     if (ls->tabu[u])
         return;
 
     long long best = ls->cost;
 
-    if (ls->independent_set[u] || ls->tightness[u] == 1)
+    if (g->m < AAP_LIMIT && (ls->independent_set[u] || ls->tightness[u] == 1))
     {
         local_search_aap(g, ls, u, ls->tightness[u] == 1);
     }
     else
     {
-        local_search_add_vertex(g, ls, u);
+        if (ls->independent_set[u])
+            local_search_remove_vertex(g, ls, u);
+        else
+            local_search_add_vertex(g, ls, u);
+
         local_search_lock_vertex(g, ls, u);
 
-        for (int i = 0; i < 32 &&
+        for (int i = 0; i < MAX_GUESS &&
                         ls->queue_count > 0 &&
                         ls->queue_count < ls->max_queue &&
                         ls->cost <= best;

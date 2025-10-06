@@ -68,7 +68,8 @@ extern "C"
 
     /**
      * @brief Set the input graph for the heuristic on the compressed
-     * sparse row (CSR) format.
+     * sparse row (CSR) format. The number of vertices can be at most
+     * 2^31, but the number of edges may exceed this limit.
      *
      * @attention This function makes a copy of the graph.
      *
@@ -84,7 +85,7 @@ extern "C"
      * from adjncy[xadj[i]] until (not including) adjncy[xadj[i + 1]].
      * @param weights array of size n holding the vertex weights.
      */
-    void chils_set_graph(void *solver, int n, const int *xadj, const int *adjncy, const long long *weights);
+    void chils_set_graph(void *solver, int n, const long long *xadj, const int *adjncy, const long long *weights);
 
     /**
      * @brief Run the heuristic for a certain number of seconds.

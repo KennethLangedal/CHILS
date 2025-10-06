@@ -5,7 +5,8 @@
 typedef struct
 {
     // Solution
-    long long cost, size;
+    long long cost;
+    int size;
     double time, time_ref;
     int *independent_set;
 
@@ -15,12 +16,13 @@ typedef struct
     int *prev_queue, *in_prev_queue;
 
     // Graph structures
-    int pool_size, max_queue;
+    int max_queue;
     long long *adjacent_weight;
-    int *tabu, *tightness, *temp, *mask, *pool;
+    int *tabu, *tightness, *temp, *mask;
 
     // Action log
-    int log_count, log_alloc, log_enabled;
+    long long log_count, log_alloc;
+    int log_enabled;
     int *log;
 
     unsigned int seed;

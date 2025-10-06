@@ -11,7 +11,8 @@ typedef struct
 {
     int solver_mode;
 
-    int n, m, _an, _am;
+    int n;
+    long long _an, m, _am;
     long long *W;
     int *X, *Y;
 
@@ -19,7 +20,8 @@ typedef struct
     chils *c;
     local_search *ls;
 
-    long long cost, size;
+    long long cost;
+    int size;
     double time;
     int *IS;
 } api_data;
@@ -70,6 +72,12 @@ int chils_add_vertex(void *solver, long long weight)
 {
     api_data *d = (api_data *)solver;
 
+    if (d->n >= INT_MAX - 1)
+    {
+        fprintf(stderr, "Number of vertices must be less than %d\n", INT_MAX);
+        exit(1);
+    }
+
     if (d->n == d->_an)
     {
         d->_an *= 2;
@@ -98,34 +106,35 @@ void chils_add_edge(void *solver, int u, int v)
     d->m++;
 }
 
-void chils_set_graph(void *solver, int n, const int *xadj, const int *adjncy, const long long *weights)
+void chils_set_graph(void *solver, int n, const long long *xadj, const int *adjncy, const long long *weights)
 {
     api_data *d = (api_data *)solver;
 
     d->g = malloc(sizeof(graph));
     d->g->n = n;
-    d->g->V = malloc(sizeof(int) * (n + 1));
+    d->g->m = xadj[n];
+    d->g->V = malloc(sizeof(long long) * (n + 1));
     d->g->E = malloc(sizeof(int) * xadj[n]);
     d->g->W = malloc(sizeof(long long) * n);
 
     for (int u = 0; u <= n; u++)
         d->g->V[u] = xadj[u];
 
-    for (int i = 0; i < xadj[n]; i++)
+    for (long long i = 0; i < xadj[n]; i++)
         d->g->E[i] = adjncy[i];
 
     for (int u = 0; u < n; u++)
         d->g->W[u] = weights[u];
 }
 
-static inline int compare(const void *a, const void *b)
+static inline int chils_api_compare(const void *a, const void *b)
 {
     return (*(int *)a - *(int *)b);
 }
 
 void chils_construct_graph(api_data *d)
 {
-    int *V = malloc(sizeof(int) * (d->n + 1));
+    long long *V = malloc(sizeof(int) * (d->n + 1));
     int *E = malloc(sizeof(int) * d->m * 2);
     long long *W = malloc(sizeof(long long) * d->n);
 
@@ -153,7 +162,7 @@ void chils_construct_graph(api_data *d)
         V[i] = ps - V[i];
     }
 
-    for (int i = 0; i < d->m; i++)
+    for (long long i = 0; i < d->m; i++)
     {
         if (d->X[i] < 0 || d->X[i] >= d->n || d->Y[i] < 0 || d->Y[i] >= d->n)
         {
@@ -164,13 +173,13 @@ void chils_construct_graph(api_data *d)
     }
 
     for (int i = 0; i < d->n; i++)
-        qsort(E + V[i], V[i + 1] - V[i], sizeof(int), compare);
+        qsort(E + V[i], V[i + 1] - V[i], sizeof(int), chils_api_compare);
 
-    int p = 0;
+    long long p = 0;
     for (int u = 0; u < d->n; u++)
     {
         int s = p;
-        for (int i = V[u]; i < V[u + 1]; i++)
+        for (long long i = V[u]; i < V[u + 1]; i++)
         {
             int v = E[i];
             if (u == v || (i > V[u] && v <= E[i - 1]))
@@ -185,7 +194,7 @@ void chils_construct_graph(api_data *d)
     E = realloc(E, sizeof(int) * p);
 
     graph *g = malloc(sizeof(graph));
-    *g = (graph){.n = d->n, .V = V, .E = E, .W = W};
+    *g = (graph){.n = d->n, .m = p, .V = V, .E = E, .W = W};
 
     d->g = g;
 }

@@ -28,8 +28,9 @@ Note that the `-p N` option is necessary to run CHILS (using **N** concurrent so
 | `-b` | Blocked mode, output additional results after 10%, 50%, and 100% of the  max time/iterations | |
 | `-g path` | Path to the input graph, see input forma | | &check;
 | `-i path` | Path to the initial solution, see output format | |
+| `-f path` | Path to folder containing initial solutions | |
 | `-o path` | Path to store the best solution found, see output format | Not stored |
-| `-p N` | Run CHILS with **N** concurrent solutions | 1 (only LS) |
+| `-p N` | Run CHILS with **N** concurrent solutions, use 1 for baseline local seach | 16 |
 | `-t sec` | Timeout in seconds | 3600 (1h) |
 | `-s sec` | Alternating interval for CHILS in seconds | 10 |
 | `-q N` | Max queue size **N** after perturbe | 32 |
