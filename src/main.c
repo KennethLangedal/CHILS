@@ -96,6 +96,7 @@ void mwis_populate_solutions(graph *g, chils *c, const char *dir_path, int verbo
     }
 
     closedir(dir);
+    return I;
 }
 
 const char *help = "CHILS --- Concurrent Hybrid Iterated Local Search\n"
