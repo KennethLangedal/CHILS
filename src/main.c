@@ -86,7 +86,7 @@ void mwis_populate_solutions(graph *g, chils *c, const char *dir_path, int verbo
 
         if (verbose)
         {
-            printf("Solution %2d: %lld\n", cost);
+            printf("Solution %2d: %lld\n", i, cost);
         }
 
         chils_set_solution(g, c, i, I);
