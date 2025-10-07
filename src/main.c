@@ -136,7 +136,7 @@ int main(int argc, char **argv)
 
     int command;
 
-    while ((command = getopt(argc, argv, "hvbg:i:o:p:t:n:s:m:q:c:r:")) != -1)
+    while ((command = getopt(argc, argv, "hvbg:i:f:o:p:t:n:s:m:q:c:r:")) != -1)
     {
         switch (command)
         {
