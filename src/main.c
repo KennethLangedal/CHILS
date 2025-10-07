@@ -57,6 +57,7 @@ int *mwis_parse_solution(graph *g, const char *path, long long *cost)
     }
 
     fclose(f);
+    return I;
 }
 
 void mwis_populate_solutions(graph *g, chils *c, const char *dir_path, int verbose)
@@ -96,7 +97,6 @@ void mwis_populate_solutions(graph *g, chils *c, const char *dir_path, int verbo
     }
 
     closedir(dir);
-    return I;
 }
 
 const char *help = "CHILS --- Concurrent Hybrid Iterated Local Search\n"
