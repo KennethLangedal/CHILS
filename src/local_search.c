@@ -307,10 +307,11 @@ void local_search_aap(graph *g, local_search *ls, int u, int imp)
         for (long long i = g->V[current]; i < g->V[current + 1]; i++)
         {
             int v = g->E[i];
-            if (ls->tightness[v] != 2 || ls->mask[v] == 1 || ls->tabu[v])
+            if (ls->tightness[v] > 2 || ls->mask[v] == 1 || ls->tabu[v])
                 continue;
 
-            int valid = 1, next = -1;
+            int valid = 1, next = current;
+
             for (long long j = g->V[v]; j < g->V[v + 1] && valid; j++)
             {
                 int w = g->E[j];
@@ -346,8 +347,11 @@ void local_search_aap(graph *g, local_search *ls, int u, int imp)
         {
             ls->temp[candidate_size++] = to_add;
             ls->mask[to_add] = 1;
-            ls->temp[candidate_size++] = to_remove;
-            ls->mask[to_remove] = 2;
+            if (ls->mask[to_remove] != 2)
+            {
+                ls->temp[candidate_size++] = to_remove;
+                ls->mask[to_remove] = 2;
+            }
             current = to_remove;
         }
     }

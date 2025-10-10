@@ -14,6 +14,18 @@ static inline void parse_id(char *Data, size_t *p, long long *v)
         *v = (*v) * 10 + Data[(*p)++] - '0';
 }
 
+static inline void skip_line(char *Data, size_t *p)
+{
+    while (Data[*p] != '\n')
+        (*p)++;
+    (*p)++;
+}
+
+static inline int graph_compare(const void *a, const void *b)
+{
+    return (*(int *)a - *(int *)b);
+}
+
 graph *graph_parse(FILE *f)
 {
     fseek(f, 0, SEEK_END);
@@ -24,10 +36,21 @@ graph *graph_parse(FILE *f)
     size_t red = fread(Data, 1, size, f);
     size_t p = 0;
 
-    long long n, m, t;
+    while (Data[p] == '%')
+        skip_line(Data, &p);
+
+    long long n, m, t = 0;
     parse_id(Data, &p, &n);
     parse_id(Data, &p, &m);
-    parse_id(Data, &p, &t);
+    while (Data[p] == ' ')
+        p++;
+    if (Data[p] >= '0' && Data[p] <= '9')
+        parse_id(Data, &p, &t);
+
+    skip_line(Data, &p);
+
+    int vertex_weights = t >= 10,
+        edge_weights = (t == 1 || t == 11);
 
     if (n >= INT_MAX)
     {
@@ -43,34 +66,46 @@ graph *graph_parse(FILE *f)
     long long ei = 0;
     for (int u = 0; u < n; u++)
     {
-        parse_id(Data, &p, W + u);
+        W[u] = 1;
         V[u] = ei;
+
+        while (p < size && Data[p] == '%')
+            skip_line(Data, &p);
+
+        if (vertex_weights)
+            parse_id(Data, &p, W + u);
+
         while (ei < m * 2)
         {
             while (Data[p] == ' ')
                 p++;
-            if (Data[p] == '\n')
+            if (Data[p] == '\n' || Data[p] == EOF)
                 break;
 
             long long e;
             parse_id(Data, &p, &e);
 
-            if (e > n)
+            if (e > n || e <= 0)
             {
                 fprintf(stderr, "Edge endpoint out of bounds, {%lld, %lld}\n", u + 1ll, e);
                 exit(1);
             }
 
             E[ei++] = e - 1;
+
+            if (edge_weights)
+                parse_id(Data, &p, &e);
         }
         p++;
+
+        qsort(E + V[u], ei - V[u], sizeof(int), graph_compare);
     }
     V[n] = ei;
 
     free(Data);
 
     graph *g = malloc(sizeof(graph));
-    *g = (graph){.n = n, .m = ei, .V = V, .E = E, .W = W};
+    *g = (graph){.n = n, .m = m * 2, .V = V, .E = E, .W = W};
 
     return g;
 }
@@ -102,28 +137,89 @@ void graph_free(graph *g)
 
 int graph_validate(graph *g)
 {
-    int M = 0;
+    long long *Edge_pos = malloc(sizeof(long long) * g->n);
+
+    long long M = 0;
     for (int u = 0; u < g->n; u++)
     {
-        int d_u = g->V[u + 1] - g->V[u];
+        Edge_pos[u] = g->V[u + 1];
+
+        long long d_u = g->V[u + 1] - g->V[u];
         if (d_u < 0)
+        {
+            fprintf(stderr, "Error in neighborhood list V: Vertex %d starts at position "
+                            "%lld and ends at position %lld\n",
+                    u + 1, g->V[u], g->V[u + 1]);
             return 0;
+        }
 
         M += d_u;
 
+        int first = 1;
         for (long long i = g->V[u]; i < g->V[u + 1]; i++)
         {
             if (i < 0 || i >= g->m)
+            {
+                fprintf(stderr, "Error in neighborhood list V: Vertex %d starts at position "
+                                "%lld and ends at position %lld\n",
+                        u + 1, g->V[u], g->V[u + 1]);
                 return 0;
+            }
 
             int v = g->E[i];
-            if (v < 0 || v >= g->n || v == u || (i > g->V[u] && v <= g->E[i - 1]))
+            if (v < 0 || v >= g->n)
+            {
+                fprintf(stderr, "Edge endpoint out of bounds for {%d,%d}\n", u + 1, v + 1);
                 return 0;
+            }
+            if (v == u)
+            {
+                fprintf(stderr, "Self edges are not allowd {%d,%d}\n", u + 1, u + 1);
+                return 0;
+            }
+            if (i > g->V[u] && v <= g->E[i - 1])
+            {
+                fprintf(stderr, "Unsorted neighborhood for vertex %d: {...,%d,%d,...}\n", u + 1, g->E[i - 1] + 1, v + 1);
+                return 0;
+            }
+
+            if (u > v)
+            {
+                if (Edge_pos[v] >= g->V[v + 1] || g->E[Edge_pos[v]] != u)
+                {
+                    if (Edge_pos[v] >= g->V[v + 1] || g->E[Edge_pos[v]] > u)
+                        fprintf(stderr, "Undirected edge encountered: Found {%d,%d} but not {%d,%d}\n", u + 1, v + 1, v + 1, u + 1);
+                    else
+                        fprintf(stderr, "Undirected edge encountered: Found {%d,%d} but not {%d,%d}\n", v + 1, g->E[Edge_pos[v]] + 1, g->E[Edge_pos[v]] + 1, v + 1);
+                    return 0;
+                }
+                Edge_pos[v]++;
+            }
+            else if (first)
+            {
+                Edge_pos[u] = i;
+                first = 0;
+            }
+        }
+    }
+
+    for (int u = 0; u < g->n; u++)
+    {
+        if (Edge_pos[u] != g->V[u + 1])
+        {
+            int v = g->E[Edge_pos[u]];
+            fprintf(stderr, "Undirected edge encountered: Found {%d,%d} but not {%d,%d}\n", u + 1, v + 1, v + 1, u + 1);
+            return 0;
         }
     }
 
     if (M != g->V[g->n] || M != g->m)
+    {
+        fprintf(stderr, "Wrong edge count, found %lld, but file says %lld\n", M / 2, g->m / 2);
         return 0;
+    }
+
+    free(Edge_pos);
 
     return 1;
 }

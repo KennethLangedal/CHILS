@@ -26,7 +26,7 @@ chils *chils_init(graph *g, int p, unsigned int seed)
     c->d_core = malloc(sizeof(graph));
     c->d_core->n = 0;
     c->d_core->m = 0;
-    c->d_core->V = malloc(sizeof(int) * (g->n + 1));
+    c->d_core->V = malloc(sizeof(long long) * (g->n + 1));
     c->d_core->V[0] = 0;
     c->d_core->E = malloc(sizeof(int) * g->V[g->n]);
     c->d_core->W = malloc(sizeof(long long) * g->n);
@@ -216,6 +216,8 @@ void chils_run(graph *g, chils *c, double tl, long long cl, int verbose)
             /* Construct the D-core */
 #pragma omp single
             {
+                end = omp_get_wtime();
+                elapsed = end - start;
                 chils_update_best(c);
                 if (verbose)
                     chils_print(c, ci, elapsed);
@@ -225,6 +227,8 @@ void chils_run(graph *g, chils *c, double tl, long long cl, int verbose)
 
 #pragma omp single
             {
+                end = omp_get_wtime();
+                elapsed = end - start;
                 if (verbose)
                     chils_print(c, ci, elapsed);
             }

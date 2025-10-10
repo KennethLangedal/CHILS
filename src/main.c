@@ -268,7 +268,7 @@ int main(int argc, char **argv)
         if (num_threads > 0)
             printf("Threads: \t\t%d\n", num_threads > run_chils ? run_chils : num_threads);
         else if (run_chils > 1 && num_threads < 1)
-            printf("Threads: \t\t#OMP_NUM_THREADS threads\n");
+            printf("Threads: \t\t#OMP_NUM_THREADS\n");
         printf("\n");
     }
 
