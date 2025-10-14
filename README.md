@@ -60,7 +60,7 @@ Examples of typical use cases are listed below. Naturally, change `-t` (time lim
 ### Baseline Local Search
 
 ```
-./CHILS -g [path]
+./CHILS -g [path] -p 1
 ```
 
 ### Sequential CHILS
