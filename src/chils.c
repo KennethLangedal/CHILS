@@ -134,7 +134,7 @@ static inline int chils_api_compare(const void *a, const void *b)
 
 void chils_construct_graph(api_data *d)
 {
-    long long *V = malloc(sizeof(int) * (d->n + 1));
+    long long *V = malloc(sizeof(long long) * (d->n + 1));
     int *E = malloc(sizeof(int) * d->m * 2);
     long long *W = malloc(sizeof(long long) * d->n);
 
